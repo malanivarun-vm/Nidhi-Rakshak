@@ -1,0 +1,35 @@
+# Scaffolded default CI (pattern: ho-ai-knowledge-base).
+# No secrets are configured in CI - that is the enforcement mechanism for
+# "tests never call real APIs".
+# Branch protection (via /project-setup) requires this `test` job green.
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: install and check
+        run: |
+          if [ ! -f pnpm-lock.yaml ]; then
+            echo "No lockfile yet - project not bootstrapped, skipping checks"
+            exit 0
+          fi
+          pnpm install --frozen-lockfile
+          pnpm run --if-present lint
+          pnpm run --if-present typecheck
+          pnpm run --if-present check
+          pnpm run --if-present test
+          pnpm run --if-present build
