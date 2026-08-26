@@ -8,6 +8,10 @@ Both developers read this file before touching feature code. It is the source of
 
 **A owns diagnosis. B consumes diagnosis and owns resolution.** A may produce a new diagnosis version after re-check; B never derives or overwrites the verdict.
 
+## Frontend icon contract
+
+Both developers use `lucide-react` for interface icons. Icons are supporting affordances, never the sole carrier of meaning; pair them with the member-facing label and follow `docs/DESIGN.md` for sizing, contrast, and placement. Do not add a second icon library.
+
 ## Identifiers and enums
 
 All persisted IDs are PostgreSQL UUIDs. External/demo IDs are stable strings only in fixtures (`case-golden-*`). Shared enums are defined in `src/domain/contracts.ts` and mirrored in `src/db/schema.ts`.

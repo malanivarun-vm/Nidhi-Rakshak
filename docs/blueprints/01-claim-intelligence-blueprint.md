@@ -133,7 +133,7 @@ Every session is one coherent commit. Read this blueprint, the shared contract, 
 
 ### 10. Tech Stack
 
-Next.js 15 App Router, React 19, strict TypeScript, Next route handlers, Drizzle ORM/Postgres on Supabase, Zod, Vitest, Playwright, Biome, pnpm, deployed on Vercel. No auth or external EPFO integration is required for the simulated P0. Forbidden: CSS-in-JS, Redux/SWR, npm/yarn, `any`, class components, MUI/Chakra/Mantine, moment/date-fns, barrel imports, and production `console.log`.
+Next.js 15 App Router, React 19, strict TypeScript, Next route handlers, Drizzle ORM/Postgres on Supabase, Zod, Vitest, Playwright, Biome, pnpm, `lucide-react` for icons, deployed on Vercel. No auth or external EPFO integration is required for the simulated P0. Forbidden: CSS-in-JS, Redux/SWR, npm/yarn, `any`, class components, MUI/Chakra/Mantine, moment/date-fns, barrel imports, competing icon libraries, and production `console.log`.
 
 ### 11. File Structure
 

@@ -121,7 +121,7 @@ Every session is one coherent commit. Read this blueprint, shared contract, PRD/
 
 ### 10. Tech Stack
 
-Next.js 15 App Router, React 19, strict TypeScript, Next route handlers, Drizzle ORM/Postgres on Supabase, Zod, Vitest, Playwright, Biome, pnpm, deployed on Vercel. B starts fixture-first. Forbidden: CSS-in-JS, Redux/SWR, npm/yarn, `any`, class components, MUI/Chakra/Mantine, moment/date-fns, barrel imports, and production `console.log`.
+Next.js 15 App Router, React 19, strict TypeScript, Next route handlers, Drizzle ORM/Postgres on Supabase, Zod, Vitest, Playwright, Biome, pnpm, `lucide-react` for icons, deployed on Vercel. B starts fixture-first. Forbidden: CSS-in-JS, Redux/SWR, npm/yarn, `any`, class components, MUI/Chakra/Mantine, moment/date-fns, barrel imports, competing icon libraries, and production `console.log`.
 
 ### 11. File Structure
 

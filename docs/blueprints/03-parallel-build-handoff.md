@@ -3,7 +3,7 @@
 ## Prepared base
 
 Base branch: `main`  
-Prepared SHA: `a26a9b2740fc1e3bbf0b71db915f9b960e6b0463` (foundation commit; final docs-only SHA follows)  
+Prepared SHA: `FINAL_SHA`  
 Read first: this file, `00-shared-integration-contract.md`, the relevant blueprint, PRD/journeys, and `docs/DESIGN.md`.
 
 Deployment target: Vercel. Database target: Supabase Postgres. Obtain environment values from the project owner; do not add provider secrets to the repo.
@@ -38,6 +38,8 @@ git worktree add ../Nidhi-Rakshak-resolution-recovery -b feat/resolution-recover
 ## Protected boundaries
 
 No casual edits to shared types, `src/db/schema.ts`, migrations, package files, root layout, global CSS, env schema, analytics bootstrap, seed infrastructure, or the other domain. A owns diagnosis; B consumes `DiagnosisResult` and owns resolution. `docs/DESIGN.md` is the sole UI/UX/frontend source of truth for both branches.
+
+Frontend icon library: `lucide-react` only.
 
 ## Integration
 
