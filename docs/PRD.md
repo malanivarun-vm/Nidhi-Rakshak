@@ -5,7 +5,7 @@
 **Platform:** Employees’ Provident Fund Organisation (EPFO)
 **Primary surface:** EPFO Member e-Sewa / Claim Status
 **Prototype:** Independent simulated prototype. No live EPFO, Aadhaar, PAN, bank or employer data is read or written.
-**Last updated:** 26 August 2026
+**Last updated:** 27 August 2026
 
 ---
 
@@ -379,35 +379,190 @@ Instead, rejection reasons are mapped into a smaller set of reusable **journey f
 
 ---
 
-# 8. Rejection Taxonomy
+# 8. Rejection Taxonomy and Remedy Contract (v2)
 
-The current working taxonomy contains multiple rejection reasons spanning identity, banking, service records, eligibility and other cases. The taxonomy itself already establishes that ownership cannot simply be attached to a rejection code. The same mismatch can lead to Fix, Fight or Forward depending on the underlying records. 
+This section supersedes the earlier v1 taxonomy. Three v1 rows were wrong or stale and must not be used: the Mark Exit waiting rule, the spouse-joint bank rule, and the Joint Declaration vs online correction rule. All three are corrected below.
 
-Each rejection code therefore carries a common contract.
+## 8.1 Verification status
 
-## Rejection Contract
+A verification run completed on 26 August 2026 against EPFO circulars. Sourcing caveat: epfindia.gov.in redirects to epfo.gov.in and the circular PDF paths returned 404 to direct fetch, so the findings below come from search-indexed content and mirrored verbatim quotes. Good enough to build on. Not good enough to put a specific number on screen without a second look.
 
-| Field                  | Purpose                                      |
-| ---------------------- | -------------------------------------------- |
-| `code`                 | Stable internal identifier                   |
-| `category`             | High-level taxonomy                          |
-| `journey_type`         | Determines the UX family                     |
-| `epfo_text_patterns`   | Known rejection text variants                |
-| `member_facing_reason` | Plain-English explanation                    |
-| `records_to_compare`   | Relevant records only                        |
-| `mool_signal`          | What constitutes meaningful first divergence |
-| `verdict_condition`    | Rule deciding Fix / Fight / Forward          |
-| `default_owner`        | Safe owner when rule cannot fully resolve    |
-| `member_action`        | Smallest safe member step                    |
-| `counterparty_action`  | What another actor must do                   |
-| `correction_route`     | Existing EPFO / external route               |
-| `evidence_required`    | Minimum evidence required                    |
-| `falsifier`            | What would prove the diagnosis wrong         |
-| `ui_modules`           | Which UX modules appear                      |
-| `prototype_support`    | Golden / Supported / Unsupported             |
-| `verification_status`  | Verified / Unverified / Blocking             |
+| Circular | Date | What it changed |
+|---|---|---|
+| Joint Declaration SOP 3.0, WSU | 31 Jul / 1 Aug 2024 | 12 correctable parameters. Minor change needs 2 documents, major needs 3. Employer attestation mandatory. Employers have no rights over other establishments' records. |
+| Member Profile Updation | 16 Jan 2025 | Aadhaar-validated UAN holders self-correct 9 profile fields with no documents, no employer verification, no EPFO approval. Exception: a UAN issued before 1 Oct 2017 still needs employer certification. |
+| WSU/IssuesofBKG/E-49885/2024-25/16 | 3 Apr 2025 | Employer approval for bank seeding abolished. Bank / NPCI validation replaces it. Cheque leaf and passbook image upload no longer required for online claims. |
 
-The existing taxonomy already contains most of these fields. 
+## 8.2 Two structural problems v2 fixes
+
+Ownership is not a property of the rejection code. One code can take three verdicts. "Discrepancy in name" is a Fix when the member's own record is wrong, a Fight when it is right and EPFO rejected anyway, and a Forward when a past employer typed the wrong value. The taxonomy needs a verdict condition that picks the branch, and a counterparty action separate from the member action.
+
+The correction route is not a property of the code either. It depends on four facts about the member's account, not on what went wrong. The same name mismatch is a thirty-second self-service edit for one member and an offline paper form with a magistrate's attestation for another. The Correction Route Ladder (Section 8.6) sets out that ladder. It is the single most important addition in v2.
+
+## 8.3 The per-code contract
+
+| Field | What it is for | Feeds |
+|---|---|---|
+| `code` | Stable identifier, never shown to the member | Everything |
+| `category` | One of the groups in Section 8.4 | Grouping |
+| `epfo_text_patterns` | The literal strings EPFO uses, so the decoder can match them | P0.2 decode |
+| `member_facing_reason` | One sentence, no jargon | P0.2 decode |
+| `records_to_compare` | Which sources hold the disputed field | P0.5 diff |
+| `mool_signal` | What counts as the first divergence, and what does not | P0.6 Mool |
+| `verdict_condition` | The test that picks Fix, Fight or Forward | P0.9 verdict |
+| `default_owner` | Who owns it when the condition cannot be evaluated | P0.9 verdict |
+| `route_eligibility` | New in v2. The four inputs that select the correction branch (Section 8.6) | Fix path, execution |
+| `member_action` | The shortest safe step, or "none" | Verdict screen |
+| `counterparty_action` | What the employer, bank or EPFO must do | Forward artifact |
+| `evidence_required` | Documents for the selected branch, which may be none | Receipt |
+| `falsifier` | One line: what would have to be true for this diagnosis to be wrong | Trust line |
+| `prototype_support` | GOLDEN, SUPPORTED, or DECLARED-UNSUPPORTED | Scope control |
+| `verification_status` | VERIFIED, UNVERIFIED, or BLOCKING | Demo safety |
+
+DECLARED-UNSUPPORTED is not a gap. A code that is in the taxonomy but out of scope is the product being honest about its edges (P0.14).
+
+## 8.4 The taxonomy
+
+Verdict: FIX member owns it. FIGHT record is correct, rejection is wrong. FORWARD another party owns it. FORK depends on data. FORK is an internal taxonomy label only; the member still sees just Fix, Fight, Forward or None. Support: G golden, S supported, D declared unsupported. Source: Y yours, + added, Y* yours corrected during verification.
+
+### A. Identity and profile
+
+| Code | Reason | Verdict | Route | Sup | Src |
+|---|---|---|---|---|---|
+| KYC_NAME_MISMATCH | Member name differs across UAN, Aadhaar, PAN, bank | FORK | Branch ladder (8.6) | G | Y* |
+| KYC_DOB_MISMATCH | Date of birth differs from Aadhaar | FORK | Branch ladder | S | Y* |
+| KYC_GENDER_MISMATCH | Gender differs from Aadhaar | FIX | Branch ladder | S | Y* |
+| RELATION_NAME_MISMATCH | Father's or spouse's name differs between a past employer record and identity records | FORK | Branch ladder | G | + |
+| AADHAAR_NOT_SEEDED | UAN not linked or validated against Aadhaar | FIX | Manage > KYC, UIDAI OTP. Gates every other branch, fix this first | S | Y |
+| KYC_PENDING_APPROVAL | Profile change uploaded but employer has not approved | FORWARD | Employer portal. Only pre-1 Oct 2017 UANs since Jan 2025 | S | Y* |
+| MULTIPLE_UANS | More than one UAN exists for the same person | FORK | Transfer plus UAN blocking request | D | + |
+| UAN_NOT_ACTIVATED | UAN generated but never activated | FIX | Member portal activation | S | + |
+| MOBILE_NOT_LINKED_AADHAAR | OTP cannot be delivered because mobile is not linked to Aadhaar | FIX | UIDAI update, then portal | S | + |
+| SIGNATURE_MISMATCH | Signature on a physical claim does not match the record | FIX | Re-submit with attested signature | D | + |
+
+### B. Banking
+
+This category was rewritten after the 3 April 2025 circular.
+
+| Code | Reason | Verdict | Route | Sup | Src |
+|---|---|---|---|---|---|
+| BANK_DETAILS_INVALID | Wrong or closed account number | FIX | Manage > KYC with Aadhaar OTP, then bank / NPCI validation. No employer approval since 3 Apr 2025 | G | Y* |
+| BANK_VALIDATION_FAILED | Account fails the bank or NPCI name-match check even though the member entered it correctly | FIGHT or FORWARD | Bank corrects its record, then re-validate | G | + |
+| BANK_IFSC_OBSOLETE | IFSC changed after a merger or branch move | FIX | Re-submit bank KYC with new IFSC | S | Y |
+| BANK_ACCOUNT_NON_SPOUSE_JOINT | Account is joint with someone other than the spouse, or third-party | FIX | Seed an individual account, or one joint with spouse | S | Y* |
+| BANK_DEPOSIT_CAP | Account has a deposit cap lower than the withdrawal amount, so credit fails | FIX | Raise the cap with the bank, or seed a different account | S | + |
+| BANK_ACCOUNT_DORMANT | Account exists but is inoperative | FORK | Reactivate, or switch account | S | + |
+| DOC_IMAGE_UNREADABLE | Cheque or passbook image blurred or cropped | FIX | Largely obsolete. Upload no longer required for online claims when the account passes validation | D | Y* |
+
+Correction to the v1 list: a v1 row said an account "shared with a spouse or parent" fails EPFO's sole-ownership rules. EPFO's UAN and KYC FAQ Q16 says verbatim: "You should seed active bank account to which you are either an individual or joint holder with your spouse." A spouse-joint account is permitted. Only the parent half was right. Telling a member to open an account they do not need is exactly the harm this product exists to prevent, so the row was rewritten and split.
+
+### C. Service record
+
+| Code | Reason | Verdict | Route | Sup | Src |
+|---|---|---|---|---|---|
+| EXIT_DATE_MISSING | Previous employer never logged the last working day | FORK | Mark Exit if eligible, otherwise employer. See the condition note below | G | Y* |
+| EXIT_DATE_WRONG | Exit date logged but incorrect | FORWARD | Employer correction, or branch ladder if self-service covers it | S | + |
+| DOJ_MISSING_OR_WRONG | Date of joining absent or inconsistent | FORWARD | Employer correction, or branch ladder | S | + |
+| SERVICE_OVERLAP | New employer's joining date precedes the previous exit date | FORWARD | Physical correction letter to the regional office | S | Y |
+| NCP_DAYS_MISMATCH | Non-contributory period days inconsistent with the wage record | FORWARD | Employer correction | D | + |
+| CONTRIBUTION_NOT_REMITTED | Employer deducted but never deposited | FORWARD | EPFiGMS grievance against the establishment | S | + |
+| ANNEXURE_K_MISSING | Service history and funds did not transfer between field offices | FIGHT | EPFiGMS grievance | S | Y |
+| MEMBER_IDS_UNMERGED | Past member IDs still open at final withdrawal | FIX | One Member One EPF Account transfer | S | Y |
+| TRANSFER_IN_PENDING | Transfer filed but not completed | FIGHT | Wait or escalate via EPFiGMS | S | + |
+| EXEMPTED_TRUST | Establishment runs its own exempted PF trust, so EPFO is not the payer | FORWARD | Claim goes to the trust | D | + |
+| EMPLOYER_DSC_INVALID | Employer's digital signature unregistered or expired | FORWARD | Employer re-registers DSC | D | + |
+
+Correction to the v1 list: a v1 row said Mark Exit becomes available "if it has been more than 2 months since you left the job." The trigger is two months from the last PF contribution received, not from the last working day. Those differ, usually by a month or more, because the final contribution lands after the member leaves. An Aadhaar-verified UAN is also required, and the exit date must fall within the month of the last contribution. The engine must read the last contribution month, not a member-stated last working day. That is a code change, not a copy change.
+
+### D. Policy and eligibility
+
+| Code | Reason | Verdict | Route | Sup | Src |
+|---|---|---|---|---|---|
+| FORM_10C_AFTER_10Y | Form 10C filed after crossing 10 years of eligible service | FIX | File Form 10D instead | S | Y |
+| SERVICE_LENGTH_SHORTFALL | Advance purpose requires more service than the member has | FIX | Choose a purpose that fits | S | Y |
+| CLAIM_EXCEEDS_CAP | Amount requested exceeds the cap for that purpose | FIX | Re-file within the cap | S | Y |
+| EPS_WAGE_DISCREPANCY | Pension contributions deposited on wages above the statutory limit | FORWARD | Joint declaration on entry wages | D | Y |
+| WAITING_PERIOD_NOT_MET | Final settlement filed before the mandatory unemployment period | FIX | Wait, or file a permitted partial advance | S | + |
+| ADVANCE_LIMIT_EXHAUSTED | Permitted number of advances for that purpose already used | FIX | Choose another purpose | D | + |
+| PURPOSE_DOCUMENT_MISSING | Supporting document for the chosen purpose not attached | FIX | Re-file with the document | S | + |
+| DUPLICATE_OR_SETTLED | A claim for the same period is already settled or in process | FIGHT | EPFiGMS if the member never received the money | S | + |
+
+### E. Death and nominee
+
+| Code | Reason | Verdict | Route | Sup | Src |
+|---|---|---|---|---|---|
+| NOMINATION_MISSING | No e-nomination on file, claim filed by a legal heir | FIX | Legal heir certificate route | D | + |
+
+### F. The catch-all
+
+| Code | Reason | Verdict | Route | Sup | Src |
+|---|---|---|---|---|---|
+| UNMAPPED_REJECTION | Rejection text matches no known pattern with sufficient confidence | none | Say so, offer the grievance route, do not guess | G | + |
+
+UNMAPPED_REJECTION is a built golden case, not an error state. It is the cheapest way to demonstrate the honesty the judging criteria reward.
+
+## 8.5 Coverage summary
+
+| Bucket | Count |
+|---|---|
+| In the v1 list | 16, becoming 17 after splitting KYC into name, DOB and gender |
+| Corrected during verification | 6 |
+| Added | 20 |
+| Total | 37 |
+| Golden, fully built | 5 |
+| Supported | 23 |
+| Declared unsupported | 9 |
+
+The most important addition is RELATION_NAME_MISMATCH. The hero example (Golden Case 1, Section 31) is a father's name introduced by a 2019 employer. The v1 list did not contain that case; it bundled "name" into the member's own name. The demo's single most important row was missing from the taxonomy.
+
+## 8.6 Correction Route Ladder
+
+This is the most useful addition in v2. It answers: if a past employer typed the wrong value, and the current employer has no authority over that record, how does anyone actually fix it?
+
+From the Joint Declaration SOP, verbatim: "No employer will have any modification rights for member accounts belonging to other/previous establishments."
+
+There is a route. Which route depends on four facts about the member's account, not on what went wrong.
+
+### The four inputs
+
+| Input | Values | Where it comes from |
+|---|---|---|
+| `aadhaar_validated` | yes / no | UAN profile |
+| `uan_issued_before_2017_10_01` | yes / no | UAN issue date |
+| `field_level` | UAN_PROFILE / MEMBER_ID_RECORD | Which record holds the divergent value |
+| `prior_establishment_status` | active / closed / unresponsive | Service history |
+
+### The four branches
+
+| Branch | Condition | What the member does | Cost |
+|---|---|---|---|
+| 1. Self-service | Aadhaar-validated UAN issued on or after 1 Oct 2017, value sits at UAN profile level | Manage > Modify Basic Details, edit, self-approve. No documents, no employer, no EPFO approval | Minutes |
+| 2. Employer certification | UAN issued before 1 Oct 2017 | One-time employer certification. Which employer is not specified in available sources | Days |
+| 3. Previous employer files it | Value sits in a past establishment's member-ID record, and that establishment is active | The previous employer files the Joint Declaration. The current employer cannot | Weeks, if they answer |
+| 4. Offline attested route | Previous establishment closed, defunct or unresponsive | Physical Joint Declaration on Annexure-II, signed by the member and attested by one authority from para 6.15 of the SOP: bank manager where the salary account is held, gazetted officer, or magistrate. Plus a letter explaining the closure. Submitted to the field office | No published SLA |
+
+Branch 4 then runs Dealing Assistant, then Section Supervisor, then APFC or RPFC. Anything touching more than five parameters goes to the OIC.
+
+### The unresolved question
+
+Whether the January 2025 self-service reaches member-ID-level particulars in a past establishment's record, or only the UAN-level profile. Every source describes it as "profile" updation, which reads as UAN level. The hero case is a father's name in a 2019 employer's record, which reads as member-ID level. No source states which wins. This is item 4 in the verification queue (Section 44) and it is BLOCKING.
+
+Do not settle this with more searching. Log into the portal with a real UAN and look at what Modify Basic Details actually offers, and whether it presents one profile or per-member-ID records. If self-service reaches it, branches 3 and 4 mostly evaporate and the Forward branch of golden case 1 weakens. If it does not, the hero case stands as written.
+
+The routing reframes the hero moment. The claim is not "this is unfixable." It is: there are four ways to fix this, three do not apply to you, here is the one that does and here is why. That is a routing problem with mechanically checkable inputs, which is far more defensible to build in the time available than root-cause attribution. It also gives Try Before You Touch something concrete to simulate: show the member which branch they are on before they touch anything.
+
+Note on the persona: pre-October-2017 UANs belong to people with longer tenure, more past employers and lower digital confidence. Closed and defunct establishments cluster in exactly the informal and semi-formal employment the primary ICP sits in. The January 2025 relaxation helped the digitally confident white-collar member most, and helped the primary ICP least.
+
+## 8.7 Sources
+
+* EPFO Simplifies Online Process for Member Profile Updation, press release, 19 January 2025
+* Joint Declaration circular, WSU, 1 August 2024, and SOP for Processing of Joint Declaration of PF Member Profile Updating, Version 2
+* EPFO FAQ on UAN and KYC, Q14 and Q16, on bank account seeding
+* Seeding bank account details with UAN, EPFO Order WSU/IssuesofBKG/E-49885/2024-25/16, 3 April 2025
+* EPFO Simplifies Claim Settlement Process, press release, April 2025
+* Secondary reporting on the Mark Exit two-month rule, from CreditMantri and RTI Wiki
+
+epfindia.gov.in redirects to epfo.gov.in and the circular PDF paths returned 404 to direct fetch. Content above was read through search indexes and verbatim mirrors. Re-verify anything before it becomes an on-screen number.
 
 ---
 
@@ -815,7 +970,7 @@ The current taxonomy includes `UNMAPPED_REJECTION` specifically for this reason 
 
 # 9.9 Journey Family Mapping
 
-Each rejection code maps to a primary journey family through its rejection contract. Adding a new rejection reason should usually mean defining its contract, assigning an existing journey family, selecting reusable UI modules, and defining its ownership / verdict condition and resolution route. It should not require a new product flow.
+Each rejection code maps to a primary journey family through its rejection contract. Adding a new rejection reason should usually mean defining its contract, assigning an existing journey family, selecting reusable UI modules, and defining its ownership / verdict condition and resolution route. It should not require a new product flow. This table reflects Taxonomy v2 (Section 8): 37 codes, with verdicts and support status defined there. The journey family is the member's problem shape; the Fix / Fight / Forward / Fork verdict is separate and lives in the contract.
 
 | Rejection Type | Primary Journey Family | Secondary Module / Note |
 |---|---|---|
@@ -829,13 +984,14 @@ Each rejection code maps to a primary journey family through its rejection contr
 | UAN_NOT_ACTIVATED | Missing Data | Activation action |
 | MOBILE_NOT_LINKED_AADHAAR | Missing Data | External identity dependency |
 | SIGNATURE_MISMATCH | Validation Failure | Evidence re-submission |
-| BANK_DETAILS_INVALID | Validation Failure | Fix if evidence disagrees |
+| BANK_DETAILS_INVALID | Validation Failure | Fix; no employer step or upload since Apr 2025 |
 | BANK_IFSC_OBSOLETE | Validation Failure | Fix |
-| BANK_ACCOUNT_JOINT | Validation Failure | Rule must be verified |
-| BANK_ACCOUNT_DORMANT | Validation Failure | Bank ownership possible |
+| BANK_ACCOUNT_NON_SPOUSE_JOINT | Validation Failure | Non-spouse / third-party only; spouse-joint permitted |
+| BANK_DEPOSIT_CAP | Validation Failure | Raise cap or switch account |
+| BANK_ACCOUNT_DORMANT | Validation Failure | Fork: reactivate or switch account |
 | BANK_VALIDATION_FAILED | Validation Failure | Fight / Forward possible |
-| DOC_IMAGE_UNREADABLE | Validation Failure | Evidence Request |
-| EXIT_DATE_MISSING | Missing Data | Service Timeline |
+| DOC_IMAGE_UNREADABLE | Validation Failure | Largely obsolete; upload not required online |
+| EXIT_DATE_MISSING | Missing Data | Fork: Mark Exit vs employer; Service Timeline |
 | EXIT_DATE_WRONG | Service History | Employer ownership |
 | DOJ_MISSING_OR_WRONG | Service History | Employer ownership |
 | SERVICE_OVERLAP | Service History | Timeline |
@@ -849,7 +1005,7 @@ Each rejection code maps to a primary journey family through its rejection contr
 | FORM_10C_AFTER_10Y | Eligibility | Alternative form |
 | SERVICE_LENGTH_SHORTFALL | Eligibility | Alternative / wait |
 | CLAIM_EXCEEDS_CAP | Eligibility | Change claim |
-| EPS_WAGE_DISCREPANCY | Service History | Specialized / unsupported |
+| EPS_WAGE_DISCREPANCY | Service History | Declared unsupported; employer joint declaration |
 | WAITING_PERIOD_NOT_MET | Eligibility | Wait state |
 | ADVANCE_LIMIT_EXHAUSTED | Eligibility | Alternative |
 | PURPOSE_DOCUMENT_MISSING | Missing Data / Eligibility | Evidence Request |
@@ -1636,7 +1792,9 @@ It cannot invent provenance.
 
 Relation / name mismatch.
 
-The taxonomy’s specified golden case has Aadhaar, PAN and current profile agreeing while an older employer record differs. That condition produces Fight. 
+Code: `RELATION_NAME_MISMATCH` (a father's or spouse's name introduced by a past employer, per Taxonomy v2, Section 8). The golden case has Aadhaar, PAN and the current profile agreeing while an older employer record differs. That condition produces Fight: the member's records are correct, so the member action is none, do not change any record.
+
+If the member chooses to correct the past record anyway, run the Correction Route Ladder (Section 8.6) and show which of the four branches applies and why the other three do not. Falsifier: if the member's 2019 payslip or appointment letter shows the other spelling, this diagnosis is wrong. Whether the Jan-2025 self-service reaches past member-ID records is a BLOCKING verification item (Section 44); if it does, the Forward branch of this case weakens. 
 
 ### Journey
 
@@ -1670,7 +1828,7 @@ Receipt
 
 Date of Exit missing.
 
-The current taxonomy intentionally treats this as conditional: depending on the applicable self-service rule, the member may be able to Fix it or the employer may own it. That rule remains a blocking verification item. 
+Code: `EXIT_DATE_MISSING`, verdict FORK (Taxonomy v2, Section 8). The verdict is conditioned on a verified rule: if two months have elapsed since the last PF contribution received, and the UAN is Aadhaar-verified, the member can self-serve via Mark Exit and the verdict is FIX; otherwise the employer owns it and the verdict is FORWARD. The exit date must fall within the month of the last contribution. The engine must read the last contribution month, not a member-stated last working day. That is a code change, not a copy change. The two-month-from-last-contribution rule is VERIFIED via secondary sources; whether the Jan-2025 self-service supersedes the Mark Exit gate for date of leaving is BLOCKING (Section 44). 
 
 For the golden Forward demo, use the state where employer action is required.
 
@@ -1702,7 +1860,7 @@ Track
 
 Invalid bank detail.
 
-The taxonomy specifies that if the member’s evidence disagrees with the UAN value, the member should correct the failing field; if the values already agree and validation still fails, the case should not blindly remain Fix. 
+Code: `BANK_DETAILS_INVALID`, verdict FIX (Taxonomy v2, Section 8). If the member's own record disagrees with the UAN value, the member corrects the one failing field under Manage > KYC, authenticated by Aadhaar OTP. If the values already agree and validation still fails, hand to `BANK_VALIDATION_FAILED` (Fight or Forward), do not blindly stay Fix. Since the 3 April 2025 circular WSU/IssuesofBKG/E-49885/2024-25/16, there is no employer approval step and no cheque or passbook upload when the account passes bank / NPCI validation. VERIFIED against that circular. 
 
 ### Journey
 
@@ -2027,25 +2185,21 @@ Every supported diagnosis ends in:
 
 # 44. Verification Queue
 
-The current taxonomy identifies several claims requiring verification before they can safely appear in the product, with the highest-risk items affecting the golden cases directly. 
+Updated after the 26 August 2026 verification run (Taxonomy v2, Section 8). Three v1 blocking items are resolved, one new blocking item is open, and the rest carry soft uncertainty labels.
 
-For build/demo priority:
+| # | Item | Status |
+|---|---|---|
+| 1 | Mark Exit waiting period | RESOLVED, and the v1 row was wrong. Two months from last contribution received, not from the last working day. Aadhaar-verified UAN required; exit date within the month of last contribution |
+| 2 | Joint account with spouse | RESOLVED, and the v1 row was wrong. Spouse-joint is permitted. Row rewritten and split (BANK_ACCOUNT_NON_SPOUSE_JOINT) |
+| 3 | Joint Declaration vs online correction | RESOLVED, and the v1 row was a year out of date. Replaced by the Correction Route Ladder (Section 8.6) |
+| 4 | Does Jan 2025 self-service reach past member-ID records | NEW AND BLOCKING. Settle by logging into the portal, not by searching. Sits on Golden Case 1 |
+| 5 | Delayed-claim interest rule | OPEN. Gates any interest counter. Cut if not verified |
+| 6 | Service minimums per advance purpose | OPEN. Non-golden, soft label acceptable |
+| 7 | Form 10C service threshold | OPEN. Non-golden |
+| 8 | Mandatory unemployment period before final settlement | OPEN. Non-golden |
+| 9 | Statutory EPS wage limit | OPEN. Non-golden |
 
-### Must verify
-
-1. self-service eligibility / waiting condition for Mark Exit
-2. current Joint Declaration vs Basic Details correction rules
-3. any exact bank account acceptance rule used in demo
-
-### Cut if not verified
-
-* delayed-claim interest rule
-* exact statutory thresholds
-* exact eligibility numbers
-* exact waiting periods
-* legal entitlement statements
-
-The product should never ship an attractive but unverified number.
+Item 4 is the only one on a golden case. Everything else can carry a soft uncertainty label if time runs out. The product should never ship an attractive but unverified number.
 
 ---
 
