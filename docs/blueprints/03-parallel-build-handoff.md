@@ -3,7 +3,7 @@
 ## Prepared base
 
 Base branch: `main`  
-Prepared SHA: `FINAL_SHA`  
+Prepared SHA: **the final `main` SHA printed in the preparation handoff**  
 Read first: this file, `00-shared-integration-contract.md`, the relevant blueprint, PRD/journeys, and `docs/DESIGN.md`.
 
 Deployment target: Vercel. Database target: Supabase Postgres. Obtain environment values from the project owner; do not add provider secrets to the repo.
