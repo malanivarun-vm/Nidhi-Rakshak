@@ -12,8 +12,13 @@ Deployment target: Vercel. Database target: Supabase Postgres. Obtain environmen
 
 | Developer | Branch | Worktree | Blueprint |
 |---|---|---|---|
-| Varun — Claim Intelligence | `feat/claim-intelligence` | `../Nidhi-Rakshak-claim-intelligence` | `docs/blueprints/01-claim-intelligence-blueprint.md` |
-| Harshit — Resolution & Claim Recovery | `feat/resolution-recovery` | `../Nidhi-Rakshak-resolution-recovery` | `docs/blueprints/02-resolution-recovery-blueprint.md` |
+| Varun — Claim Intelligence | `feat/claim-intelligence` | `../Nidhi-Rakshak-claim-intelligence` | `varun-implementation-guide.md` → `varun-session-playbook.md` → `varun-final-push.md` |
+| Harshit — Resolution & Claim Recovery | `feat/resolution-recovery` | `../Nidhi-Rakshak-resolution-recovery` | `harshit-implementation-guide.md` → `harshit-session-playbook.md` → `harshit-final-push.md` |
+
+Canonical execution artifacts:
+
+- Varun: `varun-implementation-guide.md` → `varun-session-playbook.md` → `varun-final-push.md`
+- Harshit: `harshit-implementation-guide.md` → `harshit-session-playbook.md` → `harshit-final-push.md`
 
 ## Starting commands
 

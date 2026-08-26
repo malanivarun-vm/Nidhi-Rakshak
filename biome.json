@@ -3,5 +3,13 @@
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2 },
   "linter": { "enabled": true, "rules": { "recommended": true } },
   "organizeImports": { "enabled": true },
-  "files": { "ignore": [".next/**", "node_modules/**", "drizzle/meta/**"] }
+  "files": {
+    "ignore": [
+      ".next/**",
+      ".vercel/**",
+      "node_modules/**",
+      "drizzle/meta/**",
+      "supabase/.temp/**"
+    ]
+  }
 }
