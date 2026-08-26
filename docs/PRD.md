@@ -1,2306 +1,2217 @@
-# Nidhi Rakshak
+# PRD: Nidhi Rakshak
 
-**EPF Claim Rescue**
-
-A claim-support layer inside the EPFO member journey that helps a rejected claimant understand what went wrong, what not to change, who owns the blocker, and what the safest next action is.
-
-| Field | Details |
-|---|---|
-| **Direct Responsible Individual (DRI)** | Harsh |
-| **Status** | Scope freeze draft |
-| **Pod / Team** | Build What Moves India Hackathon |
-| **Created Date** | 26 August 2026 |
-| **Last Updated** | 26 August 2026 |
-| **Submission Deadline** | 28 August 2026, 8pm IST |
-| **Figma** | TBD |
-| **ERD / Engineering Docs** | TBD |
-| **Mixpanel / Analytics** | TBD |
-| **Prototype Status** | Independent hackathon prototype. Not an official EPFO product. All EPFO, Aadhaar, PAN, bank and employer data shown in the prototype will be simulated. |
-| **Primary Surface** | EPFO Member e-Sewa → Claim Status → Rejected Claim |
-| **Secondary Surface** | EPFO Member e-Sewa → Claim → Pre-submission Check |
-| **Hero Feature** | Mool |
-| **Core Verdicts** | Fix / Fight / Forward |
+**Status:** Draft for Build
+**Product:** EPFO Claim Rescue Layer
+**Platform:** Employees’ Provident Fund Organisation (EPFO)
+**Primary surface:** EPFO Member e-Sewa / Claim Status
+**Prototype:** Independent simulated prototype. No live EPFO, Aadhaar, PAN, bank or employer data is read or written.
+**Last updated:** 26 August 2026
 
 ---
 
-# 😇 Problem Alignment
+# 1. Problem Alignment
 
-## The Problem
+## 1.1 The Problem
 
-When an EPFO member's withdrawal claim is rejected, the member gets a reason, but often not an answer they can safely act on.
+A rejected EPFO claim is not just a failed transaction.
 
-A rejection can look like:
+For a member, especially someone who is not deeply familiar with EPFO processes, a rejection often creates a much harder problem:
 
-> **Rejected: discrepancy in name**
+> **What exactly went wrong, whose responsibility is it, and what should I do now?**
 
-That tells the member almost nothing about what they should actually do next.
+The rejection message may name a mismatch, missing detail or eligibility issue, but it does not necessarily tell the member:
 
-They still do not know:
+* which specific field is causing the problem
+* which record is different
+* whether their current details are actually wrong
+* whether changing something will make the situation worse
+* whether the member, employer, bank or EPFO owns the next action
+* which existing EPFO route they should use
+* what evidence they need
+* whether they should fix something, challenge the rejection, or wait for someone else
 
-- Which field is actually different?
-- Which version of the field is correct?
-- Which source has the conflicting value?
-- Where did the disagreement first appear?
-- Is this something they should fix themselves?
-- Is the employer responsible?
-- Is the rejection itself wrong?
-- Should they change their Aadhaar, PAN, EPFO profile, bank details or nothing at all?
-- Which EPFO flow should they use?
-- What happens if they change the wrong record?
+This creates trial-and-error behaviour.
 
-Today, the system effectively pushes diagnosis back onto the citizen.
+Members may:
 
-The member has to compare documents, ask HR, search YouTube, ask a relative, visit a cyber-cafe, try to understand EPFO terminology, make a correction, file again and hope that the correction was the right one.
+* change a record that was already correct
+* repeatedly submit the same claim
+* visit a cyber cafe or employer without knowing what to ask for
+* call or raise grievances without the right evidence
+* get pushed between EPFO, employer and bank
+* create a second mismatch while trying to solve the first
 
-Sometimes the member gets rejected again because they fixed the wrong thing.
+The product should not simply explain EPFO terminology better.
 
-The source case file cites a **33.8% rejection rate for final-settlement claims in FY2022-23**, and the research notes identity, KYC, bank and exit-date mismatches among common causes.
-
-The core problem is therefore not simply that claims get rejected.
-
-The bigger problem is:
-
-> **After a rejection, the member does not know what the rejection actually means, whether they should touch their own record at all, or who needs to act next.**
+It should **diagnose the blocker, establish ownership, prevent harmful changes, and take the member to the right next action.**
 
 ---
 
-## The current experience
+# 1.2 The Core Product Question
 
-Today, the broad journey looks like this:
+The question is not:
 
-```text
-Member leaves job
-↓
-Employer updates employment information
-↓
-Member logs into Member e-Sewa / UMANG
-↓
-Member files claim
-↓
-EPFO processes claim
-↓
-Settled OR Rejected
-↓
-If rejected:
-Member reads a short rejection reason
-↓
-Member self-diagnoses
-↓
-Finds a separate correction / grievance flow
-↓
-Tries a fix
-↓
-Files again
-```
+> “How can we explain a rejection reason?”
 
-The claim journey and the correction journey are disconnected.
+It is:
 
-The member is expected to understand how to move between them.
-
-This is the exact gap Nidhi Rakshak is solving.
-
-The source case file already frames the product as an overlay rather than a replacement and identifies both the pre-filing and post-rejection intervention points.
+> **“Given everything already known about this rejected claim, what is the safest and shortest path for this member to resolve the actual blocker?”**
 
 ---
+
+# 1.3 ICP
 
 ## Primary ICP
 
-### Primary user
+An EPFO member whose claim has already been rejected and who does not clearly understand:
 
-An EPFO member, blue-collar or white-collar, whose withdrawal claim has already been rejected and who cannot clearly understand or resolve the blocker on their own.
+* what exactly went wrong
+* whether their own record is wrong
+* who is responsible for fixing it
+* what they should do next
+* what they should avoid changing
 
-The product is not only for blue-collar workers.
+The design should prioritize members who may have:
 
-It should work for any salaried EPFO member.
+* low familiarity with EPFO terminology
+* limited understanding of government workflows
+* Hindi or code-mixed language preference
+* cheaper or older phones
+* dependence on family, employers, cyber cafes, or local helpers
+* low confidence in deciding which record is correct
+* high risk of making the wrong correction just to get the claim moving
 
-However, we should design for the harder context first:
-
-- low-cost smartphone
-- limited familiarity with EPFO
-- no clean PDFs ready
-- documents available as photos or screenshots
-- preference for Hindi or code-mixed language
-- reliance on a relative, cyber-cafe operator or helper
-- low confidence in which record is actually correct
-
-If the product works for this user, it should also work for a digitally confident white-collar employee.
-
----
-
-## Secondary user
-
-### Trusted helper
-
-A relative, family member, cyber-cafe operator or trusted person who may actually be helping the claimant navigate the process.
-
-The helper should not become the owner of the claim.
-
-The member should still be able to understand:
-
-- what is being done
-- what is being sent
-- what is being changed
-- who currently owns the blocker
-
-Guardian / helper behaviour is useful, but it is not part of the hero MVP.
+This is a design priority, not an exclusion criterion. The same product should also work for digitally confident white-collar members.
 
 ---
 
-## Future user
+# 1.4 Secondary Users
 
-### Member who has not filed yet
+The primary product is for the member, but some resolution paths require another actor.
 
-The same diagnosis system can eventually run before claim submission.
+Secondary actors include:
 
-This becomes the **Claim Compiler / Pre-flight Check**.
+* previous employer
+* current employer
+* HR / payroll team
+* bank
+* EPFO
+* trusted family member or helper
 
-The job here is not to promise approval.
+The member should not have to understand the workflow of these actors.
 
-It is to catch supported blockers before they turn into a rejection.
-
----
-
-# What the user is actually trying to do
-
-The member is not trying to:
-
-- manage KYC
-- learn EPFO terminology
-- understand correction forms
-- figure out Mark Exit
-- understand grievance categories
-- compare identity systems
-- debug their employment history
-
-They are trying to get their own money.
-
-The real questions they have are:
-
-> Why was my claim rejected?
-
-> Which record is different?
-
-> Is my current record already correct?
-
-> What should I not touch?
-
-> Where does the disagreement first appear?
-
-> Who needs to fix this?
-
-> What should I do next?
-
-> What happens if I make this correction?
-
-Our product should answer those questions directly.
+When another party owns the problem, Nidhi Rakshak should package the case so that the receiving party immediately knows what needs to be done.
 
 ---
 
-# Why the current shape is risky
+# 1.5 What the User Is Actually Trying to Do
 
-The original product idea was directionally right, but there was one important risk.
+The member is not trying to understand KYC, Joint Declaration, EPFiGMS, Mool, or Fix/Fight/Forward.
 
-Mool originally aimed to say:
+They are trying to answer:
 
-> Your employer introduced this incorrect value.
+> **Why was my claim rejected, what should I do now, and how do I fix it without making things worse?**
 
-That is too strong unless we actually have evidence of the write event.
-
-We may know where two values first disagree.
-
-We may not know:
-
-- who typed the value
-- whether the employer typed it manually
-- whether the value came through a bulk upload
-- whether another upstream system caused it
-- whether the member themselves supplied it at some point
-
-So the product should not reconstruct certainty where only chronology exists.
-
-The inversion pass changes Mool from:
-
-> **Find the culprit**
-
-to:
-
-> **Find the first observable divergence**
-
-This is a much safer and, in my view, stronger trust story.
+Every product decision should follow from that.
 
 ---
 
-# High-level Approach
-
-Nidhi Rakshak is a **claim advocate**, not another form-filler and not a free-text chatbot.
-
-It sits inside the EPFO claim journey and does five things:
-
-1. **Reads the rejection**
-2. **Shows the disagreement**
-3. **Finds the first observable divergence**
-4. **Tells the member what not to touch**
-5. **Routes the case to the right owner**
-
-The final outcome is one of three verdicts:
-
-### Fix
-
-The member-controlled record is actually wrong.
-
-### Fight
-
-The member's verified record appears correct and the rejection should be contested.
-
-### Forward
-
-Another party, such as an employer or bank, owns the incorrect or missing field.
-
-Before the member changes anything, they can also simulate the proposed correction.
-
-That gives us an important product behaviour:
-
-> **Try before you touch.**
-
-Instead of changing a record and finding out 20 days later whether the change helped or made things worse, the member can first see what the supported checks would look like after the proposed correction.
-
----
-
-# Where Nidhi Rakshak sits inside EPFO
-
-Nidhi Rakshak should not be a separate destination.
-
-The member should not need to leave EPFO, open another product, explain their problem again and then find their way back into the right government flow.
-
-It should be embedded inside the claim journey.
-
-There are two intervention points.
-
-```text
-EPFO
-│
-└── Member e-Sewa / Member Claim Journey
-    │
-    └── Claim
-        │
-        ├── Claim details / eligibility
-        │
-        ├── ◆ Nidhi Rakshak: Pre-flight Check
-        │      Check supported blockers before filing
-        │
-        ├── Submit Claim
-        │
-        └── Claim Status
-               │
-               ├── Settled
-               │
-               └── Rejected
-                      │
-                      └── ◆ Nidhi Rakshak: Claim Rescue
-                             │
-                             ├── Decode rejection
-                             ├── Compare records
-                             ├── Mool
-                             ├── Do Not Touch
-                             ├── Fix / Fight / Forward
-                             ├── Try proposed action in sandbox
-                             └── Route into existing EPFO resolution flow
-```
-
----
-
-## Primary placement: rejected claim
-
-The main Nidhi Rakshak entry point should appear directly against a rejected claim.
-
-Today:
-
-> **Rejected: discrepancy in name**
-
-Proposed:
-
-> **Rejected: discrepancy in name**
-
-> **Understand and resolve this rejection**
-
-Clicking this opens the claim already in context.
-
-The member should not need to explain again:
-
-- which claim failed
-- what the rejection reason was
-- which employer it relates to
-- which claim type they filed
-
-The product starts from the rejected claim itself.
-
-This is the hero placement.
-
----
-
-## Secondary placement: before submission
-
-Inside the claim journey, before final submission, the member can choose:
-
-> **Check my claim before submitting**
-
-The product runs only the supported checks.
-
-Example:
-
-> We found one issue that could block this claim.
-
-or:
-
-> We found no blocker in the checks we currently support.
-
-It must not say:
-
-> Your claim will definitely be approved.
-
-The system cannot know that.
-
----
-
-## What happens after the verdict
-
-Nidhi Rakshak should not invent a new bureaucratic process when an existing EPFO route already exists.
-
-Its job is to identify which route is correct.
-
-| Verdict | Meaning | Next destination |
-|---|---|---|
-| **Fix** | The member-controlled record is actually wrong. | Existing relevant EPFO self-service correction flow |
-| **Fight** | The member's record appears correct and the rejection should be contested. | Existing grievance / EPFiGMS route |
-| **Forward** | Another party owns the missing or incorrect field. | Employer / bank / responsible party |
-
-The original case file already maps Fix, Fight and Forward to existing correction, grievance and employer/bank routes.
-
----
-
-# Goals & Success
-
-## What we are trying to achieve
-
-A member should be able to come in with the artifact they already have, usually a screenshot or photograph of the rejection, and leave knowing:
-
-1. what the rejection means
-2. which records disagree
-3. where the disagreement first appears
-4. what we know versus what we are inferring
-5. what they should not change
-6. who owns the blocker
-7. whether the right route is Fix, Fight or Forward
-8. what evidence would prove our diagnosis wrong
-9. what would happen if they tried the proposed correction
-10. what action comes next
-
-The member should not need to understand EPFO's internal structure before they can resolve the problem.
-
----
-
-# North Star
+# 2. North Star
 
 ## Claim Rescue Rate
 
-**% of supported rejected claims where Nidhi Rakshak correctly identifies the blocker, assigns the correct owner and gets the member onto the correct resolution path without trial and error.**
+### Definition
 
-I do not think claim settlement itself is the right immediate North Star.
+Percentage of supported rejected claims where Nidhi Rakshak correctly:
 
-Settlement is ultimately what the user wants, but settlement still depends on EPFO, banks, employers and processing timelines outside the product.
+1. identifies the real blocker,
+2. identifies who owns that blocker,
+3. determines the correct resolution direction,
+4. gets the member onto the correct next path without trial and error.
 
-The part of the problem we directly control is:
+### Prototype definition
 
-> **Did we correctly understand the blocker and get the user onto the right path without making them guess?**
+For the hackathon, a claim is considered successfully rescued when the product gets all four right:
 
-For the prototype:
+> **Correct blocker + correct owner + correct verdict + correct next action**
 
-**Claim Rescue = correct blocker + correct ownership + correct verdict + correct next route**
+We should not use final claim settlement as the immediate North Star because settlement depends on EPFO, employers, banks, and other actors outside the product's control.
 
----
+### Supporting metrics
 
-# Aha Moments
-
-## Primary aha
-
-> **This is the first place your records stop agreeing.**
-
-Mool shows the earliest observable divergence.
-
-The member goes from:
-
-> “My claim says name mismatch.”
-
-to:
-
-> “My Aadhaar, PAN and current EPFO profile agree. The first different value appears in my 2019 employment record.”
-
-That is the hero moment.
+* % of supported rejections correctly decoded
+* % of cases with correct ownership assignment
+* % of verdicts matching golden-case truth
+* % of users who understand the next action without assistance
+* % of unsupported cases correctly refused
+* % of Fight cases where the user avoids an unnecessary or harmful correction
 
 ---
 
-## Safety aha
+# 3. Aha Moments
 
-> **Do not touch your current record.**
+Nidhi Rakshak has three distinct aha moments.
 
-This is particularly important for Fight cases.
+## Aha 1: “Now I know what is actually wrong.”
 
-The user may come in assuming:
-
-> Two things do not match, so I should change something.
-
-The product may instead tell them:
-
-> Your current record is already correct. Changing it will create more mismatches.
-
-That is unusual and valuable.
-
----
-
-## Resolution aha
-
-> **I know what happens next.**
-
-The member gets:
-
-- Fix / Fight / Forward
-- one owner
-- one next action
-- a receipt
-- one line telling them how to check whether the diagnosis is wrong
-
----
-
-# Success Criteria
-
-The numbers below are **hackathon acceptance targets**, not production benchmarks.
-
-There is no measured baseline yet.
-
-| Metric | Baseline | Target | Metric Type | Result | Comments |
-|---|---:|---:|---|---|---|
-| **Claim Rescue Rate proxy** | No measured baseline | 100% on frozen golden cases | Primary | TBD | Correct blocker + owner + verdict + next route |
-| **Rejection decode accuracy** | No measured baseline | 100% on supported demo rejection reasons | Secondary | TBD | Unsupported reasons should fail safely |
-| **Mismatch localization accuracy** | No measured baseline | 100% on supported demo records | Secondary | TBD | Exact conflicting field must be surfaced |
-| **Verdict accuracy** | No measured baseline | 100% on deterministic golden cases | Guardrail | TBD | Wrong verdict can worsen the member's record |
-| **Unfounded culprit claims** | N/A | 0 | Guardrail | TBD | Mool cannot claim who caused the error without evidence |
-| **Falsifiability line present** | N/A | 100% of supported verdicts | Guardrail | TBD | Every diagnosis must be checkable |
-| **Silent submissions** | N/A | 0 | Guardrail | TBD | Nothing is sent without explicit consent |
-| **Typing required in golden flow** | N/A | 0 free-text fields | Experience | TBD | Camera, tap and audio should be enough |
-| **Simulation labels** | N/A | 100% of simulated data / outcomes | Guardrail | TBD | Prototype must never look like live EPFO access |
-
----
-
-# Non-Goals
-
-For the hackathon prototype, we are explicitly not trying to:
-
-- replace EPFO
-- replace Member e-Sewa
-- replace UMANG
-- replace EPFiGMS
-- move PF money
-- log into live EPFO
-- write to live EPFO records
-- read live Aadhaar or PAN records
-- integrate with live bank systems
-- contact real employers
-- solve every rejection reason
-- solve duplicate UAN cases
-- build a generic EPFO chatbot
-- build production WhatsApp integration
-- build production SMS
-- build production IVR / missed-call flows
-- predict the probability that a grievance will succeed
-- let an LLM make legal or entitlement decisions
-- claim that a simulated action was actually filed
-- build an interest counter unless the underlying member-facing rule is verified from a suitable primary source
-
----
-
-# 🤝 Solution
-
-# Key Features
-
-The previous scope had too many P0 and P1 features for the time available.
-
-The revised scope is intentionally smaller.
-
-The question now is not:
-
-> What else can we add?
-
-The question is:
-
-> What needs to work for the central product claim to be believable?
-
----
-
-# P0: must work
-
-## P0.1 Camera-first rejection capture
-
-The product starts from the artifact the user already has.
-
-Primary CTA:
-
-> **Take a photo of your rejection**
-
-Secondary CTA:
-
-> Upload screenshot
-
-We should not start with:
-
-> Enter rejection reason
-
-or:
-
-> Enter your name
-
-The member should not need to manually retype information already visible in the rejection or documents.
-
-### Requirements
-
-- camera capture
-- screenshot upload
-- image preview
-- extracted rejection text
-- user can confirm extracted text if required
-- persistent simulation label
-- no free-text required in golden flow
-
----
-
-# P0.2 Rejection Decode
-
-Convert the rejection into one plain-language explanation.
+The product moves the user from a vague rejection message to a concrete blocker.
 
 Example:
 
-### EPFO
+> **We found the problem. One older PF record has a different name.**
 
-> Rejected: discrepancy in name
+The member no longer has to interpret the rejection themselves.
 
-### Nidhi Rakshak
+---
 
-> One of the names in your employment records does not match your current identity records.
+## Aha 2: “I know what I should not change.”
 
-Internally, the rejection maps to a structured damage code.
+This is the product's strongest safety moment.
 
 Example:
+
+> **Your current name is correct. Don’t change it.**
+
+This matters because many rejected-claim journeys currently push the member toward changing something without first establishing which record is actually wrong.
+
+The product should actively prevent a user from creating a second problem while trying to solve the first.
+
+---
+
+## Aha 3: “I know exactly what happens next.”
+
+Once the blocker is understood, the product gives one clear action.
+
+Examples:
+
+> **Fix this bank detail.**
+
+> **Resolve this with EPFO.**
+
+> **Your previous employer needs to update your last working day.**
+
+> **You do not need to do anything right now. This transfer is already in progress.**
+
+The member should not have to decide whether they need Basic Details, Joint Declaration, EPFiGMS, employer action, bank action, or another route.
+
+Nidhi Rakshak makes that decision for the supported case and takes them to the correct next step.
+
+---
+
+## The combined product moment
+
+The complete aha is:
+
+> **I understand what went wrong, I know what not to touch, and I know exactly what to do next.**
+
+That is the core value of Nidhi Rakshak.
+
+---
+
+# 4. Product Principle
+
+## Primary principle
+
+> **Never ask the member for information EPFO already has.**
+
+Because Nidhi Rakshak sits within the EPFO claim journey, the rejected claim itself is already available.
+
+We should not ask the member to:
+
+* screenshot the rejection
+* photograph the rejection
+* enter claim ID
+* enter UAN
+* type the rejection reason
+* type details that are already present in EPFO
+
+---
+
+## Input hierarchy
+
+| Priority | Input                                                        | Behaviour                                                |
+| -------- | ------------------------------------------------------------ | -------------------------------------------------------- |
+| 1        | Existing EPFO claim context                                  | Use automatically                                        |
+| 2        | Other records already available within the supported context | Compare automatically                                    |
+| 3        | One-tap confirmation                                         | Use when ambiguity can be resolved simply                |
+| 4        | Additional evidence                                          | Ask for photo/upload only if it can change the diagnosis |
+| 5        | Voice                                                        | Use for accessibility and explanation                    |
+| 6        | Typing                                                       | Last resort                                              |
+
+The design principle becomes:
+
+> **Context-first, zero duplication. Ask only for evidence the system does not already have.**
+
+---
+
+# 5. High-Level Approach
+
+Nidhi Rakshak acts as a **claim rescue layer inside EPFO**.
+
+It does five things:
+
+### 1. Decode
+
+Translate the rejection into plain language.
+
+### 2. Diagnose
+
+Look only at the records relevant to that rejection.
+
+### 3. Establish ownership
+
+Determine whether the blocker belongs to:
+
+* the member
+* EPFO
+* employer
+* bank / another party
+
+### 4. Protect
+
+Tell the member what they should not change when their existing record is already correct.
+
+### 5. Route
+
+Take them to the shortest valid resolution path.
+
+The internal framework is:
+
+> **Fix / Fight / Forward**
+
+But the user should not have to learn those terms.
+
+---
+
+# 6. Where Nidhi Rakshak Lives
+
+Nidhi Rakshak is not a separate government portal.
+
+It is an embedded diagnosis and routing layer within the existing EPFO claim journey.
+
+## Primary placement
 
 ```text
-IDENTITY_NAME_MISMATCH
+EPFO
+└── Member e-Sewa
+    └── Claim
+        └── Claim Status
+            ├── Settled
+            └── Rejected
+                └── Understand & resolve this rejection
+                    └── Nidhi Rakshak
 ```
 
-### Requirements
+The primary CTA appears directly against a rejected claim:
 
-- supported rejection strings map to deterministic codes
-- unsupported rejection reason does not get guessed
-- if decode fails, product says it cannot safely classify the rejection
-- original rejection text remains visible
-- plain-language explanation shown in English / Hindi where supported
+> **Understand & resolve this rejection**
 
 ---
 
-# P0.3 Side-by-side Record Diff
+## Secondary placement
 
-The product should make the disagreement visually obvious.
+Before claim submission:
 
-Example:
+```text
+File Claim
+↓
+Review Claim
+↓
+Check for blockers
+↓
+Submit
+```
 
-| Source | Father's Name | State |
-|---|---|---|
-| Aadhaar | RAMESH BADIGER | Verified |
-| PAN | RAMESH BADIGER | Verified |
-| Current EPFO Profile | RAMESH BADIGER | Simulated EPFO |
-| 2019 Employment Record | RAJESH BADIGER | Simulated historical record |
-
-The incorrect / conflicting characters should be highlighted.
-
-### Requirements
-
-Every field should retain:
-
-- source
-- raw value
-- normalized value
-- verification state
-- confidence where relevant
-- simulated / live state
-
-The user should be able to see why the system thinks the records disagree.
+This becomes the future / secondary **Claim Compiler or Pre-flight Check**.
 
 ---
 
-# P0.4 Mool: First Divergence Timeline
+# 7. Core Journey
 
-Mool is the hero feature.
+Every supported rejected claim follows the same high-level spine.
 
-The original version aimed to reconstruct where the error came from and who caused it.
+```text
+Rejected Claim
+↓
+Understand & resolve this rejection
+↓
+Use existing EPFO claim context
+↓
+Decode rejection
+↓
+Determine rejection family
+↓
+Load only the relevant records
+↓
+Do we have enough evidence?
+├── No
+│   ↓
+│   Ask for specific missing evidence
+│   ↓
+│   Re-run
+│   ↓
+│   Still insufficient?
+│   ↓
+│   Refuse safely
+│
+└── Yes
+    ↓
+    Explain actual blocker
+    ↓
+    Show relevant comparison / timeline / rule
+    ↓
+    Determine ownership
+    ↓
+    Fix / Fight / Forward internally
+    ↓
+    Translate verdict into plain user-facing action
+    ↓
+    Route to correct EPFO / employer / bank flow
+    ↓
+    Track until blocker clears
+```
 
-The revised product should be more careful.
+The important design decision is:
 
-Mool answers:
+> **We do not create a separate journey for every rejection reason.**
 
-> **Where is the first point where the records we can see stop agreeing?**
+Instead, rejection reasons are mapped into a smaller set of reusable **journey families**.
 
-Example:
+---
 
-> Your Aadhaar, PAN and current EPFO profile show RAMESH.
+# 8. Rejection Taxonomy
 
-> The first record we can see with RAJESH is your 2019 employment record.
+The current working taxonomy contains multiple rejection reasons spanning identity, banking, service records, eligibility and other cases. The taxonomy itself already establishes that ownership cannot simply be attached to a rejection code. The same mismatch can lead to Fix, Fight or Forward depending on the underlying records. 
+
+Each rejection code therefore carries a common contract.
+
+## Rejection Contract
+
+| Field                  | Purpose                                      |
+| ---------------------- | -------------------------------------------- |
+| `code`                 | Stable internal identifier                   |
+| `category`             | High-level taxonomy                          |
+| `journey_type`         | Determines the UX family                     |
+| `epfo_text_patterns`   | Known rejection text variants                |
+| `member_facing_reason` | Plain-English explanation                    |
+| `records_to_compare`   | Relevant records only                        |
+| `mool_signal`          | What constitutes meaningful first divergence |
+| `verdict_condition`    | Rule deciding Fix / Fight / Forward          |
+| `default_owner`        | Safe owner when rule cannot fully resolve    |
+| `member_action`        | Smallest safe member step                    |
+| `counterparty_action`  | What another actor must do                   |
+| `correction_route`     | Existing EPFO / external route               |
+| `evidence_required`    | Minimum evidence required                    |
+| `falsifier`            | What would prove the diagnosis wrong         |
+| `ui_modules`           | Which UX modules appear                      |
+| `prototype_support`    | Golden / Supported / Unsupported             |
+| `verification_status`  | Verified / Unverified / Blocking             |
+
+The existing taxonomy already contains most of these fields. 
+
+---
+
+# 9. Journey Families
+
+We use eight reusable journey types.
+
+```text
+MISMATCH
+MISSING_DATA
+VALIDATION_FAILURE
+SERVICE_HISTORY
+ELIGIBILITY
+RECORD_CONSOLIDATION
+PENDING_PROCESS
+UNSUPPORTED
+```
+
+A ninth specialized family, `BENEFICIARY / SUCCESSION`, exists conceptually but is out of scope for the hackathon build. Death and nominee claims change the actor (nominee, spouse, child, dependant, legal heir), which changes identity, authentication, evidence, entitlement, consent and product language. It should not be forced into the generic Missing Data family.
+
+The journey family represents the **member's underlying problem**, not the EPFO taxonomy itself. A journey family identifies the structure of the problem; Fix / Fight / Forward runs afterwards and identifies the resolution direction. The same journey family can therefore end differently for different members.
+
+---
+
+# 9.1 Journey Family A: Mismatch
+
+## User question
+
+> Which value is actually wrong?
+
+Examples include:
+
+* member name mismatch
+* DOB mismatch
+* relation name mismatch
+* some bank-name validation issues
+
+## Journey
+
+```text
+Mismatch detected
+↓
+Show exact conflicting field
+↓
+Compare relevant records
+↓
+Show first meaningful divergence if useful
+↓
+Determine which record should be acted on
+↓
+Fix / Fight / Forward
+```
+
+## Example user experience
+
+### We found the problem
+
+Your current records show:
+
+**RAMESH BADIGER**
+
+But one older PF record from 2019 shows:
+
+**RAJESH BADIGER**
 
 Then:
 
-> We cannot see who entered this value.
+### Your current name is correct. Don’t change it.
 
-This is intentionally different from:
+Your Aadhaar, PAN and current PF record already match.
 
-> Your 2019 employer typed this incorrectly.
-
-Unless we have direct evidence of that action, we should not say it.
-
----
-
-## Mool evidence states
-
-Every timeline event should be one of:
-
-| State | Meaning |
-|---|---|
-| **Verified** | The underlying record directly shows the value / event |
-| **Inferred** | The sequence suggests something but the exact write event is not visible |
-| **Unknown** | Available evidence is insufficient |
-
-Mool should never turn an inferred event into a verified claim because the generated explanation sounds plausible.
-
----
-
-## Example timeline
-
-```text
-2017
-Aadhaar
-RAMESH BADIGER
-Verified
-
-2018
-PAN
-RAMESH BADIGER
-Verified
-
-2019
-Employment Record
-RAJESH BADIGER
-First observable divergence
-
-2024
-Current EPFO Profile
-RAMESH BADIGER
-Simulated
-```
-
-Output:
-
-> **This is the first place your records stop agreeing.**
-
-Not:
-
-> This is definitely who caused the problem.
-
----
-
-# P0.5 Do Not Touch
-
-For Fight cases, the most important output may not be a recommendation.
-
-It may be a prohibition.
-
-Example:
-
-# DO NOT CHANGE YOUR CURRENT NAME
-
-Your current identity records agree.
-
-Changing your current record may create additional mismatches.
-
-This should be visually louder than the rest of the diagnosis.
-
-The user should understand this within seconds.
-
-### Why this matters
-
-A rejected claimant may assume:
-
-> Something does not match. I should change my Aadhaar or EPFO name.
-
-That can make the problem worse.
-
-The product should sometimes act like a safety layer first.
-
----
-
-# P0.6 Fix / Fight / Forward
-
-Every supported case ends with one clear verdict.
-
-## Fix
-
-The member-controlled record is genuinely wrong.
-
-Example:
-
-Wrong bank IFSC.
-
-Output:
-
-> **FIX**
-
-> This value should be corrected before you file again.
-
----
-
-## Fight
-
-The member's verified record appears correct.
-
-Output:
-
-> **FIGHT**
-
-> Do not change your current record. Contest the rejection using this evidence.
-
----
-
-## Forward
-
-Another party owns the field.
-
-Example:
-
-Date of Exit is missing and the employer owns that field.
-
-Output:
-
-> **FORWARD**
-
-> This is not yours to fix. Your previous employer needs to update this field.
-
-The original case material already defines Fix / Fight / Forward as the core advocate behaviour.
-
----
-
-# P0.7 Falsifiability Line
-
-Every diagnosis should tell the user what evidence would prove us wrong.
-
-Example:
-
-> **Check us:** If your 2019 payslip also shows RAMESH, this diagnosis may be wrong.
-
-This shifts trust from:
-
-> Believe the AI.
-
-to:
-
-> Here is exactly how you can check our conclusion.
-
-### Requirements
-
-- one falsifiability line for every supported golden case
-- clearly separated from the recommendation
-- must reference evidence the user can realistically inspect
-- cannot be generic filler
-
----
-
-# P0.8 Try Before You Touch
-
-Before the member changes anything, they can simulate the correction.
-
-This turns the prototype's biggest limitation, simulated data, into a product feature.
-
-### Fight example
-
-Current state:
-
-| Source | Value |
-|---|---|
-| Aadhaar | RAMESH |
-| PAN | RAMESH |
-| EPFO Profile | RAMESH |
-| 2019 Employment Record | RAJESH |
-
-User tries:
-
-> Change current EPFO profile to RAJESH
-
-Simulation:
-
-| Check | Before | After |
-|---|---|---|
-| Aadhaar match | ✓ | ✕ |
-| PAN match | ✓ | ✕ |
-| 2019 record match | ✕ | ✓ |
-| Total supported mismatches | 1 | 2 |
-
-Recommendation:
-
-> **Do not make this change. It creates more mismatches.**
-
----
-
-### Fix example
-
-Current bank IFSC:
-
-> ABCD0001234
-
-Verified bank IFSC:
-
-> ABCD0005678
-
-Simulation:
-
-| State | Blockers |
-|---|---:|
-| Before | 1 |
-| After | 0 |
-
-Recommendation:
-
-> This correction clears the supported bank mismatch.
-
----
-
-## Sandbox rules
-
-The sandbox must never say:
-
-> Your claim will now definitely succeed.
-
-It may say:
-
-> This change clears the blocker detected by the checks we currently support.
-
----
-
-# P0.9 Forwardable Case Receipt
-
-The previous PRD left the receipt format open.
-
-We should lock it.
-
-## Primary format
-
-**Forwardable image**
-
-The receipt exists to travel.
-
-The member may need to send it to:
-
-- employer
-- HR
-- family helper
-- cyber-cafe operator
-- grievance support
-- another person helping with the claim
-
-An in-app card alone is not enough.
-
-A PDF can be a later extension.
-
----
-
-## Receipt content
-
-### Nidhi Rakshak Case Summary
-
-**Claim issue**  
-Name discrepancy
-
-**What we found**  
-Aadhaar, PAN and current EPFO profile agree.
-
-**First divergence**  
-The first conflicting value we can see appears in the 2019 employment record.
-
-**What we do not know**  
-We cannot see who entered this value.
-
-**Verdict**  
-FIGHT
-
-**Do not do this**  
-Do not change your current name.
-
-**Why**  
-Changing it would create mismatches with Aadhaar and PAN.
-
-**Check us**  
-If your 2019 payslip also shows RAMESH, this diagnosis may be wrong.
-
-**Next action**  
-Contest the rejection using the evidence above.
-
-**SIMULATED PROTOTYPE**
-
----
-
-# P0.10 Simulation / Confidence / Provenance Labels
-
-This product deals with identity and money.
-
-We should not hide uncertainty.
-
-Every relevant record should show whether it is:
-
-- verified
-- simulated
-- inferred
-- unknown
-
-Every outcome should be clear that the hackathon prototype did not actually:
-
-- change a government record
-- submit a grievance
-- contact an employer
-- settle PF money
-
----
-
-# P0.11 Refusal State
-
-The product should be allowed to stop.
-
-If the evidence is insufficient:
-
-> **We cannot diagnose this safely yet.**
-
-Then:
-
-> We need one older employment record to determine whether this mismatch existed before 2019.
-
-This is not an error state.
-
-It is a trust behaviour.
-
-A product working with identity and money should prove that it knows when not to answer.
-
----
-
-# P1: build only after P0 is stable
-
-## P1.1 Tap any field to hear it
-
-The user can tap any important field and hear the value.
-
-Example:
-
-Tap:
-
-> Father's Name: RAJESH
-
-Audio:
-
-> Your father's name in this record is Rajesh.
-
-The voice layer and diff become one interaction.
-
----
-
-# P1.2 Pre-recorded audio for golden cases
-
-Instead of depending on live Sarvam or another production voice API for the demo, we can use pre-recorded audio for the frozen cases.
-
-This reduces demo risk.
-
-The goal is to demonstrate the interaction, not production infrastructure.
-
----
-
-# P1.3 Claim Compiler / Pre-flight Check
-
-Run supported checks before claim submission.
-
-Example:
-
-> One issue may block this claim.
-
-> Your bank IFSC does not match the verified bank record.
-
-The user can then run Fix before submitting.
-
----
-
-# P1.4 Consent + Simulated Execution
-
-Once the diagnosis is complete, the product can show exactly what would be sent.
-
-Example:
-
-> We will prepare a grievance containing:
-
-- claim number
-- rejection reason
-- evidence
-- Mool timeline
-- verdict
-- requested action
-
-The member then approves.
-
-Nothing leaves the system silently.
-
----
-
-# P1.5 Employer-oriented Forward Package
-
-A Forward case has a second user.
-
-The employer.
-
-So the output should not be designed only for the claimant.
-
-Example package:
-
-**Employee**  
-Rahul Kumar
-
-**Blocking field**  
-Date of Exit
-
-**Current state**  
-Missing
-
-**Requested action**  
-Update Date of Exit
-
-**Why this matters**  
-Claim cannot proceed until this field is updated.
-
-**Supporting evidence**  
-Attached
-
-**Requested by**  
-27 August
-
-This makes the next actor's job easier.
-
-A Forward verdict without designing for the receiving party is incomplete.
-
----
-
-# P2: future considerations
-
-- Guardian / Helper Mode
-- real WhatsApp integration
-- missed-call / IVR
-- full audio-first experience
-- Prove-It-Back scam checker
-- persistent settlement-readiness checks
-- new-job record checks
-- collective case intelligence
-- identity alias / truth layer
-- nominee / death claim support through Virasat
-- employer-side prevention
-- cohort-level pattern detection
-- broader rejection-code support
-
----
-
-# Future Considerations
-
-## Persistent readiness
-
-Eventually, the system should not wait for a rejection.
-
-It can detect problems when they enter the record.
-
-For example:
-
-> A new employer record has been added and one identity field no longer matches your current records.
-
-This makes withdrawal readiness a standing state rather than something checked only when money is needed.
-
----
-
-## Audio-first experience
-
-The longer-term accessibility bar should be:
-
-> Can a member complete the core journey without needing to read long screens?
-
-This can eventually include:
-
-- Hindi audio
-- code-mixed voice
-- tap-to-hear
-- voice confirmations
-- missed calls
-- callbacks
-- IVR
-
-For the hackathon, we should not let this expand the core scope.
-
----
-
-# Key Flows
-
-# Flow 1: Fight
-
-## Situation
-
-The claim has been rejected with:
-
-> Rejected: discrepancy in name
-
-### Step 1: Entry
-
-The rejected claim shows:
-
-> **Understand and resolve this rejection**
-
-The user opens Nidhi Rakshak.
-
-Or in the standalone prototype, the user takes a photo of the rejection.
-
-### Step 2: Decode
-
-System identifies:
-
-```text
-damage_code = IDENTITY_NAME_MISMATCH
-```
-
-User sees:
-
-> One of the names in your employment records does not match your current identity records.
-
-### Step 3: Compare
-
-| Source | Value |
-|---|---|
-| Aadhaar | RAMESH BADIGER |
-| PAN | RAMESH BADIGER |
-| Current EPFO Profile | RAMESH BADIGER |
-| 2019 Employment Record | RAJESH BADIGER |
-
-The difference is highlighted.
-
-### Step 4: Mool
-
-Timeline:
-
-> Aadhaar: RAMESH  
-> PAN: RAMESH  
-> 2019 employment record: RAJESH  
-> Current EPFO profile: RAMESH
-
-Output:
-
-> **This is the first place your records stop agreeing.**
-
-> The first conflicting value we can see appears in your 2019 employment record.
-
-> We cannot see who entered it.
-
-### Step 5: Do Not Touch
-
-# DO NOT CHANGE YOUR CURRENT NAME
-
-> Your current identity records already agree.
-
-> Changing your current name may create more mismatches.
-
-### Step 6: Falsifiability
-
-> **Check us:** If your 2019 payslip also shows RAMESH, this diagnosis may be wrong.
-
-### Step 7: Sandbox
+The older record is the one that needs attention.
 
 CTA:
 
-> What if I change my current EPFO name?
-
-System simulates the change.
-
-Result:
-
-> You would reduce one mismatch but create two new ones.
-
-### Step 8: Verdict
-
-# FIGHT
-
-> Do not change your current record.
-
-> Contest the rejection.
-
-### Step 9: Receipt
-
-Generate shareable case summary.
-
-### Step 10: Action
-
-Preview grievance payload.
-
-Ask for explicit consent.
-
-Prototype simulates submission.
-
-### Step 11: Tracking
-
-Show:
-
-> Current owner: EPFO grievance
-
-> Next date to check: 2 September
-
-No fake percentage.
+**Resolve this with EPFO**
 
 ---
 
-# Flow 2: Forward
+# 9.2 Journey Family B: Missing Data
 
-## Situation
+## User question
 
-The claim is blocked because Date of Exit is missing.
+> What information is missing and who needs to add it?
 
-### Step 1: Diagnose
+Examples:
 
-> Your Date of Exit is missing.
+* exit date missing
+* Aadhaar not linked
+* approval pending
+* supporting document missing
+* joining date missing
 
-### Step 2: Ownership
+## Journey
 
-> This field is controlled by your previous employer.
-
-### Step 3: Verdict
-
-# FORWARD
-
-> This is not yours to fix.
-
-### Step 4: Employer package
-
-Generate a forwardable employer-ready artifact.
-
-### Step 5: Handoff
-
-Member forwards it to employer / HR.
-
-### Step 6: Tracking
-
-> Waiting on previous employer.
-
-> Next escalation date: X.
-
-If we cannot support a real escalation rule, the prototype should use a simulated date and label it clearly.
-
----
-
-# Flow 3: Fix
-
-## Situation
-
-Bank IFSC is incorrect.
-
-### Step 1: Diff
-
-Show:
-
-| Source | IFSC |
-|---|---|
-| Current EPFO bank record | ABCD0001234 |
-| Verified bank record | ABCD0005678 |
-
-### Step 2: Ownership
-
-> This is a member-correctable field.
-
-### Step 3: Sandbox
-
-Simulate correction.
-
-Before:
-
-> 1 supported blocker
-
-After:
-
-> 0 supported blockers
-
-### Step 4: Verdict
-
-# FIX
-
-> Update this bank record before filing again.
-
-### Step 5: Route
-
-Send user into the existing relevant correction path.
-
----
-
-# Flow 4: Pre-flight
-
-## Situation
-
-The member has not filed yet.
-
-### Step 1
-
-User taps:
-
-> Check my claim before submitting
-
-### Step 2
-
-Supported checks run.
-
-### Step 3A: issue found
-
-> We found one issue that could block this claim.
-
-Show Fix / Forward where applicable.
-
-### Step 3B: no issue found
-
-> We found no blocker in the checks we currently support.
-
-Do not promise approval.
-
----
-
-# Flow 5: Refusal
-
-## Situation
-
-The evidence is incomplete.
+```text
+Required field missing
+↓
+Explain what is missing
+↓
+Explain why the claim needs it
+↓
+Determine who can provide/update it
+↓
+Route
+```
 
 Example:
 
-We can see:
+### Your previous employer needs to update your last working day.
 
-- current Aadhaar
-- current EPFO
-- 2019 employment record
+Your Date of Exit is missing from your PF record.
 
-but not an older record required to establish chronology.
+You cannot correct this yourself right now.
 
-### Output
+CTA:
 
-# We cannot diagnose this safely yet.
+**Send this to my employer**
 
-> We need one older employment record to determine whether this mismatch existed before 2019.
+If the user is legally able to self-serve based on the applicable rule:
 
-No verdict.
+### You can update this yourself.
 
-No fake Mool story.
+CTA:
 
-No simulated action.
+**Update Date of Exit**
 
----
-
-# Key Logic
-
-## Product principle
-
-> **AI reads the mess. Deterministic code makes consequential decisions.**
-
-The original case file already separates AI interpretation from deterministic decision logic.
-
-| Stage | Type | What it does | What it must not do |
-|---|---|---|---|
-| **Camera / OCR** | AI | Read screenshot and document photos | Decide identity or fault |
-| **Voice / Audio** | AI / pre-recorded | Read or speak information | Make verdict decisions |
-| **Decode** | Deterministic | Map supported rejection to damage code | Guess unsupported reason |
-| **Match** | Deterministic | Normalize and compare values | Silently merge identities |
-| **Mool** | AI-assisted with evidence boundaries | Explain first observable divergence | Invent culprit or intent |
-| **Verdict Engine** | Deterministic | Fix / Fight / Forward | Let model decide |
-| **Sandbox** | Deterministic | Apply simulated change and rerun checks | Promise claim approval |
-| **Falsifiability** | Case rules | State what would prove diagnosis wrong | Give generic disclaimer |
-| **Receipt** | Structured generation | Summarize evidence + verdict | Add unsupported claims |
-| **Consent Gate** | Deterministic | Require approval before outbound action | Submit silently |
+The exact conditions must be verified before being used as product truth.
 
 ---
 
-# Record Normalization Logic
+# 9.3 Journey Family C: Validation Failure
 
-Before comparison, values may need deterministic normalization.
+## User question
 
-Possible steps:
+> My detail looks correct, so why is it still failing?
 
-- trim whitespace
-- uppercase / lowercase normalization
-- punctuation removal where appropriate
-- transliteration
-- phonetic normalization where explicitly supported
-- exact string comparison
-- controlled similarity fallback
+Examples:
 
-Similarity should help surface a potential match.
+* bank validation failed
+* IFSC obsolete
+* bank account inactive
+* unreadable document
+* bank details invalid
 
-It should not silently decide that two identities are the same.
-
----
-
-# Mool Rules
-
-Mool may say:
-
-> The records agree until 2019.
-
-Mool may say:
-
-> The first different value we can see appears in the 2019 employment record.
-
-Mool may say:
-
-> We cannot determine who entered it.
-
-Mool may not say:
-
-> Your employer caused this.
-
-unless we have evidence that directly supports that statement.
-
-Mool may not infer:
-
-- intent
-- person responsible
-- exact write mechanism
-- legal liability
-
-from chronology alone.
-
----
-
-# Verdict Logic
-
-## Fix
-
-Return Fix when:
-
-- the blocking field is genuinely wrong
-- the field is controlled by the member or has a member-accessible correction route
-- the evidence supports the corrected value
-- confidence meets threshold
-
----
-
-## Fight
-
-Return Fight when:
-
-- the member's verified current records agree
-- changing them would create or worsen inconsistencies
-- the rejection appears inconsistent with the available evidence
-- the case is supported by the rule set
-
-Fight must trigger Do Not Touch.
-
----
-
-## Forward
-
-Return Forward when:
-
-- another party owns the field
-- the member cannot directly correct it
-- a known handoff route exists
-
-The flow should produce a receiving-party artifact.
-
----
-
-# Confidence Logic
-
-Possible states:
-
-### High confidence
-
-Enough evidence exists for a supported verdict.
-
-### Medium confidence
-
-We have a likely interpretation but require member confirmation of one field.
-
-### Low confidence
-
-Evidence is insufficient.
-
-Return refusal.
-
-Do not force a verdict just because the UI expects one.
-
----
-
-# Proposed Prototype Data Contract
+## Journey
 
 ```text
-case_id
+Validation failed
+↓
+Identify exact failing component
+↓
+Compare value where possible
+↓
+Determine whether member input is wrong
+↓
+Fix OR Fight/Forward
+```
 
-claim {
-  claim_type
-  rejection_text
-  rejection_date
-}
+Example:
 
-damage_code
+### Your bank details match, but the verification failed.
 
-records[] {
-  source
-  field
-  raw_value
-  normalized_value
-  verification_state
-  simulation_state
-  confidence
-}
+The account number and IFSC you entered match the document available to us.
 
-mismatches[] {
-  field
-  source_a
-  source_b
-  values
-  confidence
-}
+The problem appears to be happening during validation.
 
-mool_events[] {
-  date
-  source
-  field
-  value
-  evidence_state
-}
+CTA:
 
-first_divergence {
-  field
-  date
-  source
-  evidence_state
-}
+**See what to do next**
 
-verdict {
-  type: FIX | FIGHT | FORWARD
-  owner
-  rule_id
-}
+The system should not automatically tell the member to change correct bank information.
 
-falsifiability {
-  statement
-  required_evidence
-}
+The taxonomy already distinguishes simple bank-detail corrections from validation failures that may need Fight or Forward behaviour. 
 
-sandbox {
-  proposed_change
-  before_blockers
-  after_blockers
-}
+---
 
-next_action {
-  route
-  owner
-  payload_preview
-  consent_required
-}
+# 9.4 Journey Family D: Service History
 
-receipt {
-  summary
-  evidence
-  simulation_label
-}
+## User question
+
+> What happened across my previous jobs that is blocking this claim?
+
+Examples:
+
+* exit date issue
+* joining date issue
+* service overlap
+* contributions not deposited
+* transfer pending
+* Annexure K missing
+* past Member IDs not merged
+
+## Journey
+
+```text
+Build employment timeline
+↓
+Identify blocking event / missing transition
+↓
+Show where the timeline becomes inconsistent
+↓
+Determine owner
+↓
+Route / handoff
+```
+
+Example:
+
+```text
+ABC Industries
+Joined: Jan 2018
+Exit: Jun 2020
+
+XYZ Ltd
+Joined: May 2020
+
+⚠ These employment dates overlap.
+```
+
+User-facing:
+
+### Your employment dates overlap.
+
+Your new employment begins before your previous PF record shows that you left.
+
+### Your previous employer needs to correct this record.
+
+CTA:
+
+**Send correction request**
+
+This category is particularly important because many service-record issues are owned by an employer or EPFO rather than the member. 
+
+---
+
+# 9.5 Journey Family E: Eligibility
+
+## User question
+
+> Are my records wrong, or is this type of claim not allowed right now?
+
+Examples:
+
+* service length requirement
+* amount over cap
+* waiting period
+* wrong form
+* advance usage exhausted
+* supporting purpose document missing
+
+## Journey
+
+```text
+Eligibility rule failed
+↓
+Explain the rule simply
+↓
+Show what in this claim conflicts with it
+↓
+Offer valid alternative if one exists
+↓
+Route
+```
+
+Example:
+
+### Your details are okay.
+
+This claim cannot be processed in its current form because the amount requested is higher than the allowed amount for this purpose.
+
+CTA:
+
+**Change claim amount**
+
+Mool should generally not appear here unless chronology itself is relevant.
+
+The existing taxonomy correctly separates policy and eligibility failures from identity or service-record mismatches. 
+
+---
+
+# 9.6 Journey Family F: Record Consolidation
+
+## User question
+
+> Why do I have multiple PF or member records, and how do they get connected?
+
+Examples:
+
+* multiple UANs
+* Member IDs unmerged
+* duplicate identity structures
+* old PF account not connected to current account
+* some transfer-related structural issues
+
+This is not simply a mismatch. The problem is that multiple records representing the same person or employment history exist independently.
+
+## Journey
+
+```text
+Multiple related records detected
+↓
+Show the records / accounts that exist
+↓
+Explain their relationship
+↓
+Determine which should remain active
+↓
+Determine whether merge / transfer / blocking / escalation is required
+↓
+Show one next action
+```
+
+## Example user experience
+
+### We found two PF membership records linked to you.
+
+Your older PF balance has not yet been connected to your current account.
+
+CTA:
+
+**Bring my old PF record into this account**
+
+---
+
+# 9.7 Journey Family G: Pending / Existing Process
+
+## User question
+
+> Is something actually wrong, or is another process already happening?
+
+Examples:
+
+* KYC pending approval
+* transfer already pending
+* duplicate claim already in process
+* claim already settled
+* employer approval pending
+* existing correction already submitted
+
+## Journey
+
+```text
+Existing operation detected
+↓
+Identify current process
+↓
+Explain current owner
+↓
+Should member act?
+├── No → Prevent duplicate action
+└── Yes → Show only required follow-up
+↓
+Track
+↓
+Escalate only if necessary
+```
+
+## Example user experience
+
+### Your transfer is already being processed.
+
+You do not need to submit another transfer request.
+
+**Current owner:** EPFO
+**Your next action:** Nothing right now
+
+CTA:
+
+**Check transfer status**
+
+A valid resolution can be:
+
+> **Do nothing right now.**
+
+Preventing unnecessary action is part of claim rescue.
+
+---
+
+# 9.8 Journey Family H: Unsupported / Uncertain
+
+This is a real product path, not a generic error state.
+
+Example:
+
+### We can’t safely diagnose this rejection yet.
+
+We recognise that your claim was rejected, but the information available is not enough for us to tell you what should be changed.
+
+Then either:
+
+> We need one more document.
+
+or:
+
+> This rejection is not supported by Nidhi Rakshak yet.
+
+CTA:
+
+**Get help through EPFO**
+
+The current taxonomy includes `UNMAPPED_REJECTION` specifically for this reason and treats explicit non-diagnosis as intentional product behaviour. 
+
+---
+
+# 9.9 Journey Family Mapping
+
+Each rejection code maps to a primary journey family through its rejection contract. Adding a new rejection reason should usually mean defining its contract, assigning an existing journey family, selecting reusable UI modules, and defining its ownership / verdict condition and resolution route. It should not require a new product flow.
+
+| Rejection Type | Primary Journey Family | Secondary Module / Note |
+|---|---|---|
+| KYC_NAME_MISMATCH | Mismatch | Mool + Diff |
+| KYC_DOB_MISMATCH | Mismatch | Diff |
+| KYC_GENDER_MISMATCH | Mismatch | Diff |
+| RELATION_NAME_MISMATCH | Mismatch | Strong Mool case |
+| AADHAAR_NOT_SEEDED | Missing Data | KYC route |
+| KYC_PENDING_APPROVAL | Pending / Existing Process | Employer ownership |
+| MULTIPLE_UANS | Record Consolidation | Service history |
+| UAN_NOT_ACTIVATED | Missing Data | Activation action |
+| MOBILE_NOT_LINKED_AADHAAR | Missing Data | External identity dependency |
+| SIGNATURE_MISMATCH | Validation Failure | Evidence re-submission |
+| BANK_DETAILS_INVALID | Validation Failure | Fix if evidence disagrees |
+| BANK_IFSC_OBSOLETE | Validation Failure | Fix |
+| BANK_ACCOUNT_JOINT | Validation Failure | Rule must be verified |
+| BANK_ACCOUNT_DORMANT | Validation Failure | Bank ownership possible |
+| BANK_VALIDATION_FAILED | Validation Failure | Fight / Forward possible |
+| DOC_IMAGE_UNREADABLE | Validation Failure | Evidence Request |
+| EXIT_DATE_MISSING | Missing Data | Service Timeline |
+| EXIT_DATE_WRONG | Service History | Employer ownership |
+| DOJ_MISSING_OR_WRONG | Service History | Employer ownership |
+| SERVICE_OVERLAP | Service History | Timeline |
+| NCP_DAYS_MISMATCH | Service History | Employer ownership |
+| CONTRIBUTION_NOT_REMITTED | Service History | Employer / EPFO |
+| ANNEXURE_K_MISSING | Service History | EPFO ownership |
+| MEMBER_IDS_UNMERGED | Record Consolidation | Transfer |
+| TRANSFER_IN_PENDING | Pending / Existing Process | Tracking |
+| EXEMPTED_TRUST | Service History | External owner |
+| EMPLOYER_DSC_INVALID | Pending / Existing Process | Employer ownership |
+| FORM_10C_AFTER_10Y | Eligibility | Alternative form |
+| SERVICE_LENGTH_SHORTFALL | Eligibility | Alternative / wait |
+| CLAIM_EXCEEDS_CAP | Eligibility | Change claim |
+| EPS_WAGE_DISCREPANCY | Service History | Specialized / unsupported |
+| WAITING_PERIOD_NOT_MET | Eligibility | Wait state |
+| ADVANCE_LIMIT_EXHAUSTED | Eligibility | Alternative |
+| PURPOSE_DOCUMENT_MISSING | Missing Data / Eligibility | Evidence Request |
+| DUPLICATE_OR_SETTLED | Pending / Existing Process | Prevent duplicate action |
+| NOMINATION_MISSING | Beneficiary / Succession | Future |
+| UNMAPPED_REJECTION | Unsupported / Uncertain | Refusal |
+
+---
+
+# 10. Dynamic UI Composition
+
+The rejection code does not map to a completely separate screen flow.
+
+It maps to reusable UI modules.
+
+```text
+Rejection
+↓
+Rejection Contract
+↓
+Journey Type
+↓
+Required UI Modules
+```
+
+## Core modules
+
+### Decode
+
+Explain what EPFO’s rejection means.
+
+### Diff
+
+Compare relevant record values.
+
+### Mool
+
+Show the first observable divergence.
+
+### Service Timeline
+
+Show chronology across employers.
+
+### Missing Detail
+
+Explain absent information.
+
+### Rule Explanation
+
+Explain eligibility failure.
+
+### Do Not Touch
+
+Warn user not to change a valid record.
+
+### Try Before You Touch
+
+Simulate a proposed correction.
+
+### Ownership
+
+Explain who needs to act.
+
+### Falsifiability
+
+Show how the user can check the diagnosis.
+
+### Evidence Request
+
+Ask only for missing information.
+
+### Resolution CTA
+
+Take the member to the actual next action.
+
+### Handoff
+
+Generate employer / bank / EPFO-ready artifact.
+
+### Receipt
+
+Create a portable case summary.
+
+### Tracking
+
+Show current owner, blocker and next step.
+
+---
+
+# 11. Example Module Configuration
+
+## RELATION_NAME_MISMATCH
+
+```text
+Decode            ✓
+Diff              ✓
+Mool              ✓
+Do Not Touch      Conditional
+Sandbox           ✓
+Falsifiability    ✓
+Resolution        ✓
+Receipt           ✓
 ```
 
 ---
 
-# Screen Requirements
+## EXIT_DATE_MISSING
 
-# Screen 1: Rejection Entry
-
-## Goal
-
-Start with what the user already has.
-
-### Main CTA
-
-> Take a photo of your rejection
-
-### Secondary CTA
-
-> Upload screenshot
-
-### Requirements
-
-- camera-first
-- no required typing
-- show uploaded artifact
-- extract rejection text
-- confirm only when extraction confidence is low
-- simulation label always visible
-- Hindi / English copy where feasible
-- audio can be layered later
+```text
+Decode             ✓
+Missing Detail     ✓
+Service Timeline   ✓
+Ownership          ✓
+Employer Handoff   Conditional
+Mool               Lightweight
+Sandbox            Optional
+Tracking           ✓
+```
 
 ---
 
-# Screen 2: What is wrong
+## CLAIM_EXCEEDS_CAP
 
-## Goal
-
-Make the disagreement obvious.
-
-### Requirements
-
-- plain-language rejection explanation
-- side-by-side values
-- source labels
-- exact differing character highlighted
-- verified / simulated / inferred states
-- no wall of text
-- CTA:
-
-> Find where this starts
+```text
+Decode             ✓
+Diff               ✕
+Mool               ✕
+Rule Explanation   ✓
+Alternative Action ✓
+Resolution         ✓
+```
 
 ---
 
-# Screen 3: Mool
+## DOC_IMAGE_UNREADABLE
 
-## Goal
-
-Show the first divergence.
-
-### Requirements
-
-- chronological timeline
-- first divergence visually dominant
-- verified versus inferred clearly shown
-- sentence:
-
-> This is the first place your records stop agreeing.
-
-- sentence where relevant:
-
-> We cannot see who entered this value.
-
-- no unsupported blame
+```text
+Decode             ✓
+Mool               ✕
+Evidence Request   ✓
+Fix                ✓
+```
 
 ---
 
-# Screen 4: Do Not Touch / Verdict
+# 12. Mool
 
-## Goal
+## What Mool is
 
-Prevent harmful action and give one next route.
+Mool identifies:
 
-### Fight state
+> **the first observable point where relevant records begin to diverge.**
 
-# DO NOT CHANGE YOUR CURRENT NAME
+It does not automatically identify a culprit.
+
+## Allowed language
+
+> The first different value we can see appears in your 2019 PF record.
+
+## Not allowed
+
+> Your employer entered your name incorrectly in 2019.
+
+Unless the actual write event or equivalent evidence is available.
+
+---
+
+# 12.1 Mool Evidence States
+
+### Verified
+
+The underlying record directly shows the value or event.
+
+### Inferred
+
+The chronology suggests a point of divergence, but the exact write event is unavailable.
+
+### Unknown
+
+There is not enough evidence.
+
+---
+
+# 12.2 Mool Is Not Universal
+
+Mool should only appear where provenance or chronology is useful.
+
+Strong use cases:
+
+* historic identity mismatch
+* relation-name mismatch
+* exit / join history
+* service overlap
+* contribution timeline
+* transfer problems
+
+Weak or unnecessary use cases:
+
+* unreadable image
+* claim exceeds cap
+* missing document
+* Aadhaar not seeded
+
+The product should never force Mool onto a rejection simply because it is a headline feature.
+
+---
+
+# 13. Fix / Fight / Forward
+
+Fix/Fight/Forward is an **internal decision framework**.
+
+The member should not have to understand those words.
+
+## FIX
+
+### Internal meaning
+
+The member owns the field or claim configuration that needs changing.
+
+### User sees
+
+> **One detail needs to be corrected.**
+
+CTA:
+
+> **Fix this detail**
+
+---
+
+## FIGHT
+
+### Internal meaning
+
+The member's relevant record appears correct and should not be changed to satisfy the rejection.
+
+### User sees
+
+> **Your current details are correct. Don’t change them.**
 
 Then:
 
-**FIGHT**
+> We’ll help you resolve this with EPFO using the records that already match.
 
-### Fix state
+CTA:
 
-**FIX**
-
-### Forward state
-
-**FORWARD**
-
-### Requirements
-
-- one clear owner
-- one clear next action
-- one thing the user should not do
-- one falsifiability line
-- sandbox CTA
-- receipt CTA
+> **Resolve this with EPFO**
 
 ---
 
-# Screen 5: Sandbox
+## FORWARD
 
-## Goal
+### Internal meaning
 
-Show the consequence before the member acts.
+Another party owns the required correction.
 
-### Requirements
+### User sees
 
-- proposed change
-- before state
-- after state
-- blocker count / supported-check result
-- no approval guarantee
-- clear recommendation
-
----
-
-# Screen 6: Receipt / Handoff
-
-## Goal
-
-Carry the diagnosis to the next actor.
-
-### Requirements
-
-- forwardable image
-- minimal text
-- evidence summary
-- first divergence
-- what we know
-- what we do not know
-- verdict
-- owner
-- falsifiability
-- next action
-- simulation label
-
----
-
-# Screen 7: Status
-
-## Goal
-
-Answer two questions:
-
-> Who owns the blocker?
-
-> When should I check again?
-
-### Requirements
-
-Do not use:
-
-> 74% complete
-
-Use:
-
-> Waiting on previous employer
-
-> Check again by 2 September
-
-Only use dates that we can support or label as simulated.
-
----
-
-# 🚀 Execution Plan
-
-We have very limited time.
-
-The core risk now is scope, not lack of ideas.
-
-The build should start with frozen golden cases.
-
-No second ideation round after scope freeze.
-
----
-
-# Golden Cases
-
-## Case 1: Fight
-
-**Rejection**  
-Identity / name mismatch
-
-**Evidence**  
-Current identity records agree. Historical employment record diverges.
-
-**Must demonstrate**
-
-- camera
-- decode
-- diff
-- Mool
-- Do Not Touch
-- falsifiability
-- sandbox
-- Fight
-- receipt
-
----
-
-## Case 2: Forward
-
-**Rejection / blocker**  
-Missing Date of Exit
-
-**Evidence**  
-Employer owns the field.
-
-**Must demonstrate**
-
-- diagnosis
-- ownership
-- Forward
-- employer-oriented artifact
-- tracker
-
----
-
-## Case 3: Fix
-
-**Blocker**  
-Wrong bank / IFSC
-
-**Evidence**  
-Verified bank value exists.
-
-**Must demonstrate**
-
-- diff
-- sandbox
-- blocker clears
-- Fix
-
----
-
-## Case 4: Refusal
-
-**Problem**  
-Evidence insufficient.
-
-**Must demonstrate**
-
-> We cannot diagnose this safely yet.
-
-and specify the missing record.
-
-This should appear in the demo because it proves the system is allowed to refuse.
-
----
-
-# Key Milestones
-
-| Milestone | Owner | Planned Delivery Date | Actual Delivery Date | Comments |
-|---|---|---|---|---|
-| Product direction finalized | Team | 26 Aug | TBD | Advocate + inversion direction |
-| ICP / North Star / aha locked | Team | 26 Aug | TBD | Completed |
-| EPFO placement finalized | Team | 26 Aug | TBD | Rejected claim primary, pre-flight secondary |
-| Golden cases frozen | Team | 26 Aug | TBD | Must freeze before build |
-| Legal / domain verification sprint | TBD | 26-27 Aug | TBD | SLA, interest, Mark Exit, Joint Declaration |
-| PRD finalized | Harsh | 27 Aug AM | TBD | No new ideation after |
-| Tech design finalized | TBD | 27 Aug AM | TBD | Data contracts + rules |
-| Design finalized | TBD | 27 Aug | TBD | Hero flow first |
-| Development starts | TBD | 27 Aug noon | TBD | Hard gate |
-| Decode + diff engine | TBD | 27 Aug | TBD | P0 |
-| Mool | TBD | 27 Aug | TBD | First divergence only |
-| Verdict engine | TBD | 27 Aug | TBD | Deterministic |
-| Sandbox | TBD | 27 Aug | TBD | P0 |
-| Receipt | TBD | 28 Aug AM | TBD | Forwardable image |
-| Refusal state | TBD | 28 Aug AM | TBD | Must be included |
-| QA | Team | 28 Aug | TBD | Product + logic + copy |
-| Demo recording | Team | 28 Aug | TBD | 2-minute video |
-| Submission summary | Team | 28 Aug | TBD | 250 words |
-| Final submission | Team | 28 Aug | TBD | Submit before deadline |
-
----
-
-# Operational Checklist
-
-| Team | Prompt | Y/N | Action | Done? |
-|---|---|---|---|---|
-| **Analytics** | Do we need additional tracking? | Yes | Track full rescue funnel | TBD |
-| **Localisation** | Does this need localisation? | Yes | English + Hindi core copy; audio if time permits | TBD |
-| **Internal Ops** | Do we need internal workflows? | Limited | Maintain golden cases and expected outputs | TBD |
-| **Partners** | Does this impact external partners? | Simulated | Employer / bank handoffs are prototype-only | TBD |
-| **Legal / Policy** | Are there potential legal ramifications? | Yes | Verify legal / financial claims before demo | TBD |
-| **Security / Privacy** | Does this expose risk vectors? | Yes | Use only simulated personal data | TBD |
-| **Accessibility** | Does the experience need low-literacy support? | Yes | Camera-first, zero typing, tap-to-hear if time | TBD |
-
----
-
-# Analytics
-
-The important thing is not whether someone uploaded a screenshot.
-
-We need to understand whether they reached a correct diagnosis and resolution route.
-
-| Event | Properties | Why |
-|---|---|---|
-| **case_started** | entry_point, input_type | How does the member enter? |
-| **rejection_decoded** | damage_code, confidence | Was the rejection understood? |
-| **diff_viewed** | field, sources | Did the user see the disagreement? |
-| **mool_viewed** | first_divergence, evidence_state | Did the hero moment happen? |
-| **do_not_touch_shown** | field, reason | Are we preventing harmful fixes? |
-| **sandbox_started** | proposed_change | Does the user test before acting? |
-| **sandbox_completed** | before_blockers, after_blockers | Did the simulated outcome change? |
-| **verdict_shown** | fix/fight/forward | Which route did we choose? |
-| **diagnosis_refused** | missing_evidence | Where did the system correctly stop? |
-| **receipt_generated** | verdict | Was the evidence packaged? |
-| **receipt_shared** | destination_type | Does the diagnosis travel to the next actor? |
-| **consent_confirmed** | action_type | Did the user approve the next action? |
-| **case_completed** | verdict | Did the rescue flow finish? |
-| **case_abandoned** | last_step | Where did the user stop? |
-
----
-
-# Guardrails
-
-## Product guardrails
-
-- Mool finds divergence, not guilt.
-- Every important value retains provenance.
-- Inferred facts are labelled as inferred.
-- Simulated records are labelled simulated.
-- Unsupported rejection reasons return refusal.
-- Every supported verdict contains a falsifiability line.
-- No action happens without consent.
-- No LLM silently decides identity.
-- No LLM chooses Fix / Fight / Forward.
-- No generated explanation can override deterministic rules.
-- Do not say “you will win.”
-- Do not promise claim approval.
-- Do not claim a grievance was filed if the prototype only simulated it.
-- Do not claim money was settled.
-- Do not show the 12% delay-penalty / interest counter unless verified before build.
-- Use only simulated personal data in the hackathon.
-
----
-
-# Risks & Mitigation
-
-| Risk | Why it matters | Mitigation |
-|---|---|---|
-| **Mool invents a culprit** | Most differentiated feature becomes the biggest trust failure | Mool only names first observable divergence unless direct evidence exists |
-| **Wrong verdict** | User may change a correct record | Deterministic verdict rules + frozen test cases |
-| **OCR reads one character incorrectly** | Could create fake mismatch | Show extracted value + confidence + confirmation gate |
-| **Prototype looks official** | Could imply live government access | Persistent “Simulated prototype, not EPFO” labelling |
-| **Too much scope** | Core flow breaks before submission | Freeze P0, no late additions |
-| **Voice dependency fails in demo** | Live audio APIs create risk | Use pre-recorded audio if audio is built |
-| **Fake status precision** | Makes the product look dishonest | Show owner + meaningful date, not fake percentage |
-| **Unsupported legal claim** | Trust / judging risk | Verify before build or cut |
-| **Forward flow stops at the claimant** | The real owner still cannot act | Design employer-facing artifact |
-| **Refusal is missing** | Product appears overconfident | Include one refusal golden case |
-
----
-
-# Marketing / GTM
-
-For the hackathon, this is not a traditional GTM problem.
-
-The product is designed as an embedded EPFO capability.
-
-The natural distribution is therefore inside the member claim journey.
-
-## Primary discovery
-
-After a rejected claim:
-
-> **Understand and resolve this rejection**
-
-## Secondary discovery
-
-Before filing:
-
-> **Check my claim before submitting**
-
-The value proposition should remain simple:
-
-> **Don't guess which record to change.**
+> **Your previous employer needs to fix this.**
 
 or:
 
-> **See what is actually blocking your PF before you touch anything.**
+> **Your bank needs to verify this.**
 
-The product should not lead with:
+CTA:
 
-- AI
-- OCR
-- agents
-- automation
-- grievance generation
+> **Send this to my employer**
 
-Those are implementation details.
+The member sees the action, not the taxonomy.
 
-The user cares about getting unstuck safely.
+## Internal Verdict → User-Facing Language
 
----
+| Internal Verdict | Internal Meaning | User-Facing Language |
+|---|---|---|
+| FIX | Member owns correction | **One detail needs to be corrected.** |
+| FIGHT | Member's relevant record is already correct | **Your current details are correct. Don’t change them.** |
+| FORWARD | Another actor owns correction | **Your employer / bank / EPFO needs to fix this.** |
+| NONE | No safe verdict | **We can’t safely tell you what to change yet.** |
 
-# Demo Story
-
-The demo should prove:
-
-1. we understand the actual blocker
-2. we do not over-claim
-3. we can stop the user from making the situation worse
-4. we can route the issue to the right person
+Never make the member interpret words like `FIGHT` or `FORWARD`.
 
 ---
 
-## Two-minute demo
+# 14. Do Not Touch
 
-### Beat 1: Start from the artifact
+This is a dedicated safety state, not a small warning.
 
-Take a photo of:
+It appears whenever:
 
-> Rejected: discrepancy in name
+* the member’s current record is supported by stronger evidence
+* changing it could introduce more mismatches
+* the recommended path is Fight rather than Fix
+
+Example:
+
+# Your current name is correct. Don’t change it.
+
+Your Aadhaar, PAN and current PF record all show:
+
+**RAMESH BADIGER**
+
+Only one older PF record is different.
+
+> Changing your current name could create more problems.
+
+CTA:
+
+**Resolve this with EPFO**
+
+---
+
+# 15. Try Before You Touch
+
+When the product recommends or warns against a record change, the user should be able to see the simulated consequence first.
+
+## Fight example
+
+### Current state
+
+```text
+Aadhaar          RAMESH ✓
+PAN              RAMESH ✓
+Current PF       RAMESH ✓
+2019 PF record   RAJESH ✕
+```
+
+1 mismatch.
+
+### If current PF changes to RAJESH
+
+```text
+Aadhaar          RAMESH ✕
+PAN              RAMESH ✕
+Current PF       RAJESH ✓
+2019 PF record   RAJESH ✓
+```
+
+2 mismatches.
+
+User sees:
+
+> **This change creates more mismatches.**
+
+> Keep your current name as it is.
+
+---
+
+## Fix example
+
+Current PF bank IFSC:
+
+`ABCD0001234`
+
+Verified evidence:
+
+`ABCD0005678`
+
+Before:
+
+> 1 blocker found
+
+After simulated correction:
+
+> No blocker found in the checks we support.
+
+User sees:
+
+> **Correcting this field clears the blocker we found.**
+
+Never:
+
+> Your claim will definitely be approved.
+
+---
+
+# 16. Falsifiability
+
+Every consequential diagnosis should tell the user how it could be wrong.
+
+Example:
+
+> **Want to double-check this?**
+
+> Look at your 2019 payslip. If it also says RAMESH BADIGER, this diagnosis may be wrong.
+
+This is intentionally different from generic:
+
+> “AI may make mistakes.”
+
+The user gets a concrete verification action.
+
+---
+
+# 17. Missing Evidence Flow
+
+Evidence acquisition happens only when information already available is insufficient.
+
+Example:
+
+### We need one more record to be sure.
+
+We can see that your current name and your older PF record are different.
+
+But we cannot safely tell which one needs attention yet.
+
+### What we need
+
+A payslip or joining document from your 2019 employer.
+
+CTA:
+
+**Take a photo**
+
+Secondary:
+
+**Upload document**
+
+---
+
+## Evidence extraction
+
+If confident:
+
+> We found the name on this document: **RAMESH BADIGER**
+
+Continue automatically.
+
+If confidence is low:
+
+> Is this name correct?
+
+**Yes** / **No**
+
+Typing is a fallback.
+
+---
+
+# 18. Refusal
+
+If the evidence is still insufficient:
+
+### We still can’t tell safely.
+
+The records available do not give us enough information to recommend changing anything.
+
+CTA:
+
+**Get help with this claim**
+
+The system must not guess simply because the user reached this point.
+
+---
+
+# 19. Resolution Routing
+
+Nidhi Rakshak should connect into existing workflows rather than recreate them.
+
+Possible destinations include:
+
+* existing Basic Details flow
+* KYC update
+* Mark Exit
+* Joint Declaration
+* transfer request
+* EPFiGMS grievance
+* employer action
+* bank action
+
+Exact current routes and eligibility conditions must be verified before being shown as authoritative product guidance.
+
+---
+
+# 20. Forward Handoff
+
+Forward is not complete when the product tells the user:
+
+> “Contact your employer.”
+
+It is complete when the receiving person knows exactly what to do.
+
+Example:
+
+## Action required for employee PF claim
+
+**Member:** Rahul Kumar
+**Problem:** Date of Exit missing
+**Employment:** ABC Industries
+**Last contribution:** May 2024
+**Requested action:** Update Date of Exit in EPFO
+
+Then:
+
+**Share with employer**
+
+---
+
+# 21. Case Receipt
+
+Every diagnosed case can produce a portable case summary.
+
+Primary format:
+
+> **Forwardable image**
+
+The receipt contains:
+
+* claim issue
+* what was found
+* relevant records
+* first divergence where applicable
+* what is still unknown
+* what not to change
+* who owns the blocker
+* recommended action
+* supporting evidence
+* how to check the diagnosis
+* current case state
+
+Prototype output must clearly say:
+
+> **SIMULATED PROTOTYPE**
+
+---
+
+# 22. Tracking
+
+Do not show fake progress percentages.
+
+Bad:
+
+> 72% resolved
+
+Better:
+
+## Your PF claim
+
+**Current blocker:** Date of Exit missing
+**Waiting on:** Previous employer
+**Last action:** Request shared
+**Next step:** Employer updates Date of Exit
+
+If a verified timeframe exists:
+
+**Check again after:** [date]
+
+---
+
+# 23. Re-check After Action
+
+Every meaningful action can trigger the supported checks again.
+
+## Resolved
+
+> **The issue we found is now resolved.**
+
+> Your records now pass the checks that previously found this blocker.
+
+CTA:
+
+**Continue with my claim**
+
+Never:
+
+> Your claim will now definitely be approved.
+
+---
+
+## Another blocker appears
+
+> **The previous issue is resolved, but we found another problem.**
+
+Then create the next diagnosis.
+
+The system should support multiple blockers over the lifetime of one claim rather than assuming one rejection equals one permanent root cause.
+
+---
+
+# 24. Repeat Rejection
+
+If the user submits again and receives another rejection:
+
+### Same blocker
+
+> The same issue is still appearing.
+
+Continue the existing case.
+
+### Different blocker
+
+> The previous issue appears resolved. EPFO has flagged a different problem this time.
+
+Start a new diagnosis linked to the same claim history.
+
+---
+
+# 25. Pre-flight / Claim Compiler
+
+Secondary entry point:
+
+```text
+File Claim
+↓
+Review
+↓
+Check for blockers
+↓
+Submit
+```
+
+## Entry
+
+### Check for common blockers before you submit
+
+We’ll check the information available for this claim.
+
+CTA:
+
+**Check my claim**
+
+---
+
+## No blocker
+
+> **We didn’t find a blocker in the checks we support.**
+
+> This does not guarantee the claim will be approved.
+
+CTA:
+
+**Continue to submit**
+
+---
+
+## Fixable blocker
+
+> **One detail may block this claim.**
+
+Route into Fix.
+
+---
+
+## External blocker
+
+> **Your previous employer needs to update one detail before you submit.**
+
+Route into Forward.
+
+---
+
+# 26. Helper Mode
+
+P1/P2.
+
+Member can say:
+
+> **Someone is helping me**
+
+Possible helper:
+
+* family
+* friend
+* trusted person
+* cyber-cafe operator
+
+A helper may:
+
+* understand the diagnosis
+* help upload evidence
+* share employer artifact
+* navigate instructions
+
+But member consent remains required for consequential actions.
+
+---
+
+# 27. Audio / Low-literacy Experience
+
+Important member-facing content should be designed so it can eventually support:
+
+> 🔊 Hear this
+
+Priority content:
+
+* what happened
+* what not to do
+* what to do next
+* who needs to act
+* what evidence is needed
+
+For the hackathon prototype, pre-recorded audio for golden cases is preferable to relying on a live voice provider.
+
+The broader interaction principle is:
+
+> **A member should be able to complete the important flow without typing paragraphs or understanding technical terminology.**
+
+---
+
+# 28. User-Facing Information Hierarchy
+
+Every diagnosis screen should follow roughly:
+
+## 1. What happened?
+
+> We found the problem.
+
+## 2. What should I not do?
+
+> Your current name is correct. Don’t change it.
+
+## 3. What should I do now?
+
+> Resolve this with EPFO.
+
+## 4. Why?
+
+Show the relevant comparison or rule.
+
+## 5. How can I check this myself?
+
+Show the falsifier.
+
+Evidence should support the decision, not bury it.
+
+---
+
+# 29. AI vs Deterministic Logic
+
+Product principle:
+
+> **AI reads the mess. Deterministic code makes consequential decisions.**
+
+## AI can be used for
+
+* reading uploaded documents
+* OCR
+* extracting values
+* transcribing voice
+* translating / simplifying language
+* generating constrained explanations
+* normalising noisy unstructured rejection text
+
+## Deterministic logic owns
+
+* rejection code mapping where known
+* comparison rules
+* ownership logic
+* Fix/Fight/Forward
+* state transitions
+* supported/unsupported boundaries
+* sandbox consequences
+* consent
+* routing
+* case status
+
+## Mool
+
+Mool may use AI-assisted explanation, but only within the evidence available.
+
+It cannot invent provenance.
+
+---
+
+# 30. Hard Guardrails
+
+1. AI never silently decides identity or entitlement.
+2. LLM never independently selects Fix/Fight/Forward.
+3. Unsupported rejection reasons are explicitly named as unsupported.
+4. No consequential action submits without explicit consent.
+5. Every prototype action is labelled as simulated.
+6. Never promise claim approval.
+7. Never promise grievance success.
+8. Never invent an official rule.
+9. Never assign blame without evidence.
+10. Never ask the member to modify a valid record merely to satisfy a rejection.
+11. Never ask the member for data EPFO already has.
+12. Ask for additional evidence only when it can materially change the diagnosis.
+
+---
+
+# 31. Key Golden Cases
+
+## Golden Case 1: Fight
+
+### Case
+
+Relation / name mismatch.
+
+The taxonomy’s specified golden case has Aadhaar, PAN and current profile agreeing while an older employer record differs. That condition produces Fight. 
+
+### Journey
+
+```text
+Rejected claim
+↓
+We found a mismatch
+↓
+Record comparison
+↓
+First divergent historical record
+↓
+Your current details are correct
+↓
+Do Not Touch
+↓
+Try Before You Touch
+↓
+Falsifiability
+↓
+Resolve with EPFO
+↓
+Receipt
+```
+
+---
+
+# 32. Golden Case 2: Forward
+
+### Case
+
+Date of Exit missing.
+
+The current taxonomy intentionally treats this as conditional: depending on the applicable self-service rule, the member may be able to Fix it or the employer may own it. That rule remains a blocking verification item. 
+
+For the golden Forward demo, use the state where employer action is required.
+
+### Journey
+
+```text
+Rejected claim
+↓
+Your last working day is missing
+↓
+Show service timeline
+↓
+You cannot update this yourself in this case
+↓
+Employer owns blocker
+↓
+Generate employer-ready request
+↓
+Share
+↓
+Track
+```
+
+---
+
+# 33. Golden Case 3: Fix
+
+### Case
+
+Invalid bank detail.
+
+The taxonomy specifies that if the member’s evidence disagrees with the UAN value, the member should correct the failing field; if the values already agree and validation still fails, the case should not blindly remain Fix. 
+
+### Journey
+
+```text
+Rejected claim
+↓
+One bank detail is wrong
+↓
+Show exact failing field
+↓
+Try proposed correction
+↓
+1 blocker → 0 supported blockers
+↓
+Fix this detail
+↓
+Correct EPFO route
+↓
+Re-check
+```
+
+---
+
+# 34. Golden Case 4: Refusal
+
+### Case
+
+Unmapped rejection.
+
+### Journey
+
+```text
+Rejected claim
+↓
+Cannot safely map rejection
+↓
+We don't recognise this rejection yet
+↓
+Ask for evidence if useful
+↓
+Still unsupported
+↓
+No diagnosis
+↓
+Safe EPFO help route
+```
+
+This is deliberately a golden experience, not a crash or generic error.
+
+---
+
+# 35. Scope
+
+## P0
+
+### P0.1 Embedded Claim Entry
+
+Open Nidhi Rakshak from a rejected claim using existing claim context.
+
+### P0.2 Decode
+
+Translate rejection into plain language.
+
+### P0.3 Rejection Contract Engine
+
+Map supported rejection to:
+
+* code
+* journey family
+* required records
+* verdict logic
+* owner
+* route
+* modules
+
+### P0.4 Journey Family Router
+
+Support the reusable journey-family model.
+
+### P0.5 Relevant Record Comparison
+
+Compare only fields that matter for the current rejection.
+
+### P0.6 Mool
+
+For supported provenance-sensitive cases.
+
+### P0.7 Ownership Engine
+
+Determine who needs to act.
+
+### P0.8 Do Not Touch
+
+Dedicated safety state.
+
+### P0.9 Fix / Fight / Forward
+
+Internal deterministic decision model.
+
+### P0.10 User-Friendly Action Translation
+
+Never expose taxonomy as the main user instruction.
+
+### P0.11 Falsifiability
+
+Checkable trust line.
+
+### P0.12 Try Before You Touch
+
+Simulated consequence.
+
+### P0.13 Missing Evidence Request
+
+Ask only for evidence necessary to resolve uncertainty.
+
+### P0.14 Refusal
+
+Safe unsupported state.
+
+### P0.15 Case Receipt
+
+Portable image artifact.
+
+### P0.16 Tracking
+
+Current blocker, owner and next step.
+
+---
+
+# 36. P1
+
+* pre-flight Claim Compiler
+* pre-recorded audio for golden flows
+* tap important text to hear it
+* employer-oriented Forward artifact
+* richer evidence upload
+* action re-check
+* helper mode
+* multilingual / Hindi-first presentation
+* persistent case history
+
+---
+
+# 37. P2
+
+* real IVR / missed-call interface
+* full audio-first navigation
+* WhatsApp execution
+* guardian mode
+* proactive employment-record checks
+* new-job readiness
+* broader rejection coverage
+* collective rejection intelligence
+* identity alias / historical truth layer
+* nominee / death-claim flows
+* employer-side prevention
+* proactive fraud / scam checking
+
+---
+
+# 38. Non-Goals
+
+For the hackathon prototype, Nidhi Rakshak does not:
+
+* replace EPFO
+* access live UAN/member records
+* submit real claims
+* submit real grievances
+* edit EPFO records
+* guarantee claim approval
+* guarantee grievance outcomes
+* support every rejection
+* identify who caused a historical mismatch unless explicitly evidenced
+* make legal entitlement decisions using an LLM
+* create an independent parallel bureaucracy
+* require users to learn internal taxonomy
+
+---
+
+# 39. Success Criteria
+
+## Product
+
+| Metric                | Prototype success                                       |
+| --------------------- | ------------------------------------------------------- |
+| Claim Rescue Rate     | Golden cases resolve to correct blocker + owner + route |
+| Diagnosis correctness | 100% on frozen golden cases                             |
+| Verdict correctness   | 100% on frozen golden cases                             |
+| Unsupported safety    | Unsupported case never receives fabricated diagnosis    |
+| Harm prevention       | Fight case visibly prevents harmful edit                |
+| Route clarity         | User is always shown one primary next action            |
+
+---
+
+## Usability
+
+A target user should be able to answer after each flow:
+
+1. What went wrong?
+2. Is my current information wrong?
+3. Who needs to do something?
+4. What should I do next?
+5. What should I avoid doing?
+
+without requiring explanation from the team.
+
+---
+
+# 40. Analytics
+
+## Core Events
+
+```text
+claim_rescue_opened
+rejection_decoded
+journey_type_selected
+record_comparison_viewed
+mool_viewed
+do_not_touch_viewed
+sandbox_started
+sandbox_completed
+verdict_generated
+evidence_requested
+evidence_added
+diagnosis_refused
+resolution_started
+forward_artifact_created
+receipt_created
+case_rechecked
+blocker_resolved
+```
+
+---
+
+# 41. Key Product Funnel
+
+```text
+Rejected Claim
+↓
+Rescue Opened
+↓
+Diagnosis Available
+↓
+Ownership Understood
+↓
+Resolution Started
+↓
+Supported Blocker Cleared
+```
+
+---
+
+# 42. Counter-Metrics
+
+We should actively monitor:
+
+* wrong verdict rate
+* unsupported cases incorrectly diagnosed
+* user attempts harmful correction after warning
+* excessive evidence requests
+* users abandoning before understanding next action
+* repeated rejection due to same blocker
+* resolution route mismatch
+
+---
+
+# 43. Main Risks
+
+## Risk 1: False confidence
+
+A confident but wrong diagnosis can be worse than the existing rejection.
+
+### Mitigation
+
+* deterministic verdict logic
+* explicit evidence
+* falsifiability
+* refusal
+* confidence boundaries
+
+---
+
+## Risk 2: Unverified EPFO rules
+
+Several current taxonomy rows still require primary-source verification. The uploaded taxonomy explicitly warns that none of the rules in the working table should be treated as verified product truth yet, and identifies blocking items for the golden cases. 
+
+### Mitigation
+
+For demo:
+
+* verify golden-case rules first
+* cut unverified legal/financial claims
+* label uncertainty rather than infer
+
+---
+
+## Risk 3: Mool overclaims causality
+
+### Mitigation
+
+Mool identifies first observable divergence, not a culprit.
+
+---
+
+## Risk 4: 36 rejection reasons create 36 products
+
+### Mitigation
+
+Use eight journey families and reusable modules.
+
+---
+
+## Risk 5: Product becomes another information page
+
+### Mitigation
+
+Every supported diagnosis ends in:
+
+> one owner + one next action
+
+---
+
+# 44. Verification Queue
+
+The current taxonomy identifies several claims requiring verification before they can safely appear in the product, with the highest-risk items affecting the golden cases directly. 
+
+For build/demo priority:
+
+### Must verify
+
+1. self-service eligibility / waiting condition for Mark Exit
+2. current Joint Declaration vs Basic Details correction rules
+3. any exact bank account acceptance rule used in demo
+
+### Cut if not verified
+
+* delayed-claim interest rule
+* exact statutory thresholds
+* exact eligibility numbers
+* exact waiting periods
+* legal entitlement statements
+
+The product should never ship an attractive but unverified number.
+
+---
+
+# 45. Execution Plan
+
+## Milestone 1: Scope + logic freeze
+
+* lock golden rejection codes
+* lock rejection contracts
+* verify blocking EPFO rules
+* lock journey-family mapping
+* lock copy
+
+---
+
+## Milestone 2: Build common shell
+
+Build:
+
+* rejected claim entry
+* decode
+* journey router
+* record comparison
+* ownership
+* receipt
+* refusal
+
+---
+
+## Milestone 3: Golden Fight
+
+Build full:
+
+* diff
+* Mool
+* Do Not Touch
+* sandbox
+* falsifiability
+* EPFO resolution
+* receipt
+
+---
+
+## Milestone 4: Golden Forward
+
+Build:
+
+* missing-data explanation
+* service timeline
+* ownership
+* employer artifact
+* tracking
+
+---
+
+## Milestone 5: Golden Fix
+
+Build:
+
+* failing-field explanation
+* comparison
+* sandbox
+* correction CTA
+* re-check
+
+---
+
+## Milestone 6: Refusal
+
+Build explicit unsupported experience.
+
+---
+
+## Milestone 7: Polish + demo
+
+* zero jargon pass
+* mobile
+* optional Hindi/audio
+* simulated labels
+* analytics
+* demo data
+* failure handling
+
+---
+
+# 46. Demo Story
+
+The demo should prove four things.
+
+## Beat 1: We diagnose
+
+Open rejected claim.
+
+No screenshot.
 
 No form.
 
 No typing.
 
-### Beat 2: Decode
-
-> One of the names in your employment records does not match your current identity records.
-
-### Beat 3: Diff
-
-Show:
-
-- Aadhaar: RAMESH
-- PAN: RAMESH
-- Current EPFO: RAMESH
-- 2019 record: RAJESH
-
-One letter glows.
-
-### Beat 4: Mool
-
-> **This is the first place your records stop agreeing.**
-
-Then:
-
-> We cannot see who entered this value.
-
-### Beat 5: Do Not Touch
-
-# DO NOT CHANGE YOUR CURRENT NAME
-
-### Beat 6: Try before you touch
-
-User simulates changing current EPFO record to RAJESH.
-
-Mismatches increase.
-
-> This change makes your records worse.
-
-### Beat 7: Fight
-
-> **FIGHT**
-
-> Contest the rejection instead.
-
-Show forwardable receipt.
-
-### Beat 8: Forward
-
-Quick second case.
-
-Missing Date of Exit.
-
-> This is not yours to fix.
-
-Employer-ready package appears.
-
-### Beat 9: Fix
-
-Wrong IFSC.
-
-Sandbox goes:
-
-> 1 blocker → 0 blockers
-
-### Beat 10: Refusal
-
-For ten seconds:
-
-> We cannot diagnose this safely yet.
-
-> We need one more record.
-
-This proves the product is allowed not to know.
+> **We found the problem.**
 
 ---
 
-# 30-second Demo
+## Beat 2: We stop harm
 
-1. Photo of rejection
-2. Decode
-3. Record diff
-4. Mool shows first divergence
-5. Do Not Touch
-6. Simulate the wrong correction
-7. Show it creates more mismatches
-8. Fight
-9. Show receipt
+Show a Fight case.
+
+> **Your current name is correct. Don’t change it.**
+
+Run Try Before You Touch.
+
+Show that changing it creates more mismatches.
 
 ---
 
-# Frame to Remember
+## Beat 3: We assign ownership
 
-The original line was:
+Show a Forward case.
 
-> This is where your error entered. It was not your mistake.
+> **Your previous employer needs to update this.**
 
-That overstates what we may know.
-
-The revised frame should be:
-
-> **This is the first place your records stop agreeing.**
-
-and directly below it:
-
-> **Your current record is already correct. Do not change it.**
-
-That is more defensible and, I think, more memorable.
+Generate an employer-ready artifact.
 
 ---
 
-# Closing Line
+## Beat 4: We know when not to answer
 
-> **You should never have to guess which record to change just to get your own money.**
+Show unsupported rejection.
 
-Nidhi Rakshak tells you what is blocking the claim, what not to touch, who needs to act, and what happens next.
+> **We can’t safely diagnose this rejection yet.**
 
----
-
-# 🛠️ Working Section
-
-# Meeting Notes
-
-## 26 August 2026 - Scope Freeze Discussion
-
-### Decisions already aligned
-
-- Primary ICP is a rejected EPFO claimant.
-- Includes both blue-collar and white-collar EPFO members.
-- Claim Rescue Rate is the North Star.
-- Mool remains the hero feature.
-- Fix / Fight / Forward remains the core decision system.
-- Product sits inside the EPFO member claim journey.
-- Primary placement is against a rejected claim.
-- Secondary placement is pre-submission.
-- Camera-first moves to P0.
-- Zero typing becomes the core interaction bar.
-- Receipt becomes a forwardable image.
-- Mool changes from culprit attribution to first observable divergence.
-- Fight cases get a first-class Do Not Touch state.
-- Every verdict gets a falsifiability line.
-- Simulation becomes Try Before You Touch.
-- One refusal case must be shown.
-- Interest counter is cut unless verified before build.
+This is a deliberate trust moment.
 
 ---
 
-# Changelog
+# 47. Final Product Definition
 
-| Change | Date | People | Comments |
-|---|---|---|---|
-| Initial advocate direction selected | 26 Aug | Team | Mool + Fix / Fight / Forward |
-| ICP clarified to include blue + white-collar members | 26 Aug | Team | Design priority still assumes harder digital context |
-| Claim Rescue Rate locked | 26 Aug | Team | Settlement not used as direct North Star |
-| EPFO placement locked | 26 Aug | Team | Rejected claim primary, pre-flight secondary |
-| Inversion pass incorporated | 26 Aug | Team | Product moves from asserting to bounding |
-| Mool redefined | 26 Aug | Team | First divergence, not culprit |
-| Camera-first promoted to P0 | 26 Aug | Team | Zero-typing hero flow |
-| Receipt format closed | 26 Aug | Team | Forwardable image |
-| Sandbox added | 26 Aug | Team | Try before you touch |
-| Do Not Touch elevated | 26 Aug | Team | First-class Fight state |
-| Refusal state added | 26 Aug | Team | Low-confidence cases stop safely |
-| P0 scope tightened | 26 Aug | Team | No further ideation after freeze |
+Nidhi Rakshak is not a rejection explainer.
 
----
+It is not a form filler.
 
-# Open Questions
+It is not a chatbot sitting next to EPFO.
 
-Most product-direction questions should be considered closed now.
+It is a **claim rescue layer embedded inside EPFO**.
 
-The remaining questions are execution questions.
+When a claim fails, it uses the context the system already has to answer:
 
-## 1. What exact rejection reasons are supported?
+> **What exactly is blocking this claim?**
 
-We need a frozen list before engineering starts.
+> **Whose responsibility is it?**
 
-Suggested golden scope:
+> **What should the member not change?**
 
-- identity / name mismatch
-- missing Date of Exit
-- bank / IFSC mismatch
-- insufficient evidence refusal case
+> **What is the safest next action?**
 
-Anything outside this should fail safely.
+And then it takes the member there.
 
----
+The internal system can be complex:
 
-## 2. What evidence exists for each golden case?
+> rejection taxonomy → evidence → Mool → ownership → Fix/Fight/Forward → routing
 
-For every case, we need to define:
+But the member-facing experience should remain simple:
 
-- records available
-- values
-- timestamps
-- verification state
-- first divergence
-- expected verdict
-- falsifiability line
-- expected sandbox behaviour
+> **Here’s what happened.**
+> **Here’s what you should not do.**
+> **Here’s who needs to act.**
+> **Here’s what happens next.**
 
----
-
-## 3. What counts as verified?
-
-We need a clear internal definition for:
-
-- verified identity record
-- simulated EPFO record
-- employer record
-- inferred event
-- unknown
-
-Otherwise the UI labels will mean nothing.
-
----
-
-## 4. What confidence threshold triggers refusal?
-
-The product should have a concrete rule for:
-
-- high confidence
-- confirmation required
-- refusal
-
-This should not be left to prompt wording.
-
----
-
-## 5. How much of execution is actually built?
-
-The hero value is diagnosis and routing.
-
-If real execution threatens P0, we should simulate the handoff rather than weakening the core.
-
----
-
-## 6. Who owns what in the build?
-
-Need to lock:
-
-- frontend
-- camera / OCR
-- case data
-- matching
-- Mool
-- verdict engine
-- sandbox
-- receipt
-- analytics
-- demo video
-
----
-
-## 7. Which legal / policy facts still need verification?
-
-The source material already flags the member-facing interpretation of the 12% delayed-claim point as needing further primary-source verification.
-
-If not verified before build freeze, cut it.
-
----
-
-# Final Product Definition
-
-> **Nidhi Rakshak is a claim-support layer embedded inside the EPFO member claim journey. Its primary surface appears against a rejected claim. It reads the rejection, shows the conflicting records, uses Mool to identify the first observable divergence, tells the member what not to change, and routes the case through Fix, Fight or Forward. Before the member changes a record, they can simulate the proposed correction and see whether it improves or worsens the checks we support. Every diagnosis is sourced, falsifiable and allowed to end in “we don't know.” A secondary pre-flight surface uses the same system before claim submission to catch supported blockers early. It does not replace EPFO's claim, correction or grievance systems. It connects them around the member's actual blocker.**
+That is the product.
