@@ -505,13 +505,14 @@ UNMAPPED_REJECTION is a built golden case, not an error state. It is the cheapes
 
 | Bucket | Count |
 |---|---|
-| In the v1 list | 16, becoming 17 after splitting KYC into name, DOB and gender |
-| Corrected during verification | 6 |
-| Added | 20 |
-| Total | 37 |
-| Golden, fully built | 5 |
+| From the prior list (source Y or Y*) | 17 |
+| Added (source +) | 21 |
+| Total distinct codes | 38 |
+| Golden | 6 |
 | Supported | 23 |
 | Declared unsupported | 9 |
+
+Count reconciled 27 August 2026. The enumerated tables define 38 distinct codes (verified, no duplicates): 6 golden, 23 supported, 9 declared-unsupported; 21 added and 17 from the prior list, 8 of which were corrected during verification. The earlier v1 summary said 37 total and 5 golden. It dropped one golden-marked code, `BANK_VALIDATION_FAILED`, which undercounts total, golden and added by one each. The four demo golden flows (Fight, Forward, Fix, Refusal) are unchanged; the six golden-marked codes map onto them.
 
 The most important addition is RELATION_NAME_MISMATCH. The hero example (Golden Case 1, Section 31) is a father's name introduced by a 2019 employer. The v1 list did not contain that case; it bundled "name" into the member's own name. The demo's single most important row was missing from the taxonomy.
 
@@ -545,9 +546,17 @@ Branch 4 then runs Dealing Assistant, then Section Supervisor, then APFC or RPFC
 
 ### The unresolved question
 
-Whether the January 2025 self-service reaches member-ID-level particulars in a past establishment's record, or only the UAN-level profile. Every source describes it as "profile" updation, which reads as UAN level. The hero case is a father's name in a 2019 employer's record, which reads as member-ID level. No source states which wins. This is item 4 in the verification queue (Section 44) and it is BLOCKING.
+Whether the January 2025 self-service reaches member-ID-level particulars in a past establishment's record, or only the UAN-level profile. Every source describes it as "profile" updation, which reads as UAN level. The hero case is a father's name in a 2019 employer's record, which reads as member-ID level. No source states which wins. This is item 4 in the verification queue (Section 44). It does not block the build: when this input is unknown the Correction Route shows the safe employer branch, never a guessed self-service path, so the golden Fight case stands either way. It only gates whether Branch 1 self-service may be offered for member-ID-level fields.
 
 Do not settle this with more searching. Log into the portal with a real UAN and look at what Modify Basic Details actually offers, and whether it presents one profile or per-member-ID records. If self-service reaches it, branches 3 and 4 mostly evaporate and the Forward branch of golden case 1 weakens. If it does not, the hero case stands as written.
+
+To settle it (about five minutes, needs a real UAN):
+
+1. Log in at the EPFO member portal (Member e-Sewa).
+2. Open Manage > Modify Basic Details.
+3. Note whether it shows one consolidated profile, or a picker of per-Member-ID records.
+4. If per-Member-ID, check whether a past employer's record is editable there. Editable means self-service reaches member-ID fields, so branches 3 and 4 shrink; not editable, or a single profile only, means the hero Forward case stands.
+5. Record the answer against verification item 4 and set the `field_level` handling accordingly.
 
 The routing reframes the hero moment. The claim is not "this is unfixable." It is: there are four ways to fix this, three do not apply to you, here is the one that does and here is why. That is a routing problem with mechanically checkable inputs, which is far more defensible to build in the time available than root-cause attribution. It also gives Try Before You Touch something concrete to simulate: show the member which branch they are on before they touch anything.
 
@@ -1794,7 +1803,7 @@ Relation / name mismatch.
 
 Code: `RELATION_NAME_MISMATCH` (a father's or spouse's name introduced by a past employer, per Taxonomy v2, Section 8). The golden case has Aadhaar, PAN and the current profile agreeing while an older employer record differs. That condition produces Fight: the member's records are correct, so the member action is none, do not change any record.
 
-If the member chooses to correct the past record anyway, run the Correction Route Ladder (Section 8.6) and show which of the four branches applies and why the other three do not. Falsifier: if the member's 2019 payslip or appointment letter shows the other spelling, this diagnosis is wrong. Whether the Jan-2025 self-service reaches past member-ID records is a BLOCKING verification item (Section 44); if it does, the Forward branch of this case weakens. 
+If the member chooses to correct the past record anyway, run the Correction Route Ladder (Section 8.6) and show which of the four branches applies and why the other three do not. Falsifier: if the member's 2019 payslip or appointment letter shows the other spelling, this diagnosis is wrong. Whether the Jan-2025 self-service reaches past member-ID records is still open (Section 44, item 4), but design-safe: when the input is unknown the Correction Route defaults to the safe employer branch, so this Fight case stands. If self-service does reach it, the Forward branch of this case weakens. 
 
 ### Journey
 
@@ -1828,7 +1837,7 @@ Receipt
 
 Date of Exit missing.
 
-Code: `EXIT_DATE_MISSING`, verdict FORK (Taxonomy v2, Section 8). The verdict is conditioned on a verified rule: if two months have elapsed since the last PF contribution received, and the UAN is Aadhaar-verified, the member can self-serve via Mark Exit and the verdict is FIX; otherwise the employer owns it and the verdict is FORWARD. The exit date must fall within the month of the last contribution. The engine must read the last contribution month, not a member-stated last working day. That is a code change, not a copy change. The two-month-from-last-contribution rule is VERIFIED via secondary sources; whether the Jan-2025 self-service supersedes the Mark Exit gate for date of leaving is BLOCKING (Section 44). 
+Code: `EXIT_DATE_MISSING`, verdict FORK (Taxonomy v2, Section 8). The verdict is conditioned on a verified rule: if two months have elapsed since the last PF contribution received, and the UAN is Aadhaar-verified, the member can self-serve via Mark Exit and the verdict is FIX; otherwise the employer owns it and the verdict is FORWARD. The exit date must fall within the month of the last contribution. The engine must read the last contribution month, not a member-stated last working day. That is a code change, not a copy change. The two-month-from-last-contribution rule is VERIFIED via secondary sources; whether the Jan-2025 self-service supersedes the Mark Exit gate for date of leaving is still open (Section 44); the golden Forward demo uses the employer-owned state, so it does not block the build. 
 
 For the golden Forward demo, use the state where employer action is required.
 
@@ -2192,14 +2201,14 @@ Updated after the 26 August 2026 verification run (Taxonomy v2, Section 8). Thre
 | 1 | Mark Exit waiting period | RESOLVED, and the v1 row was wrong. Two months from last contribution received, not from the last working day. Aadhaar-verified UAN required; exit date within the month of last contribution |
 | 2 | Joint account with spouse | RESOLVED, and the v1 row was wrong. Spouse-joint is permitted. Row rewritten and split (BANK_ACCOUNT_NON_SPOUSE_JOINT) |
 | 3 | Joint Declaration vs online correction | RESOLVED, and the v1 row was a year out of date. Replaced by the Correction Route Ladder (Section 8.6) |
-| 4 | Does Jan 2025 self-service reach past member-ID records | NEW AND BLOCKING. Settle by logging into the portal, not by searching. Sits on Golden Case 1 |
+| 4 | Does Jan 2025 self-service reach past member-ID records | OPEN, design-safe. The build ships the safe employer branch when this input is unknown (Correction Route, Section 8.6), so it does not block the build; it only gates whether Branch 1 self-service may be offered for member-ID-level fields. Settle by portal login, not by searching. Touches Golden Case 1 |
 | 5 | Delayed-claim interest rule | OPEN. Gates any interest counter. Cut if not verified |
 | 6 | Service minimums per advance purpose | OPEN. Non-golden, soft label acceptable |
 | 7 | Form 10C service threshold | OPEN. Non-golden |
 | 8 | Mandatory unemployment period before final settlement | OPEN. Non-golden |
 | 9 | Statutory EPS wage limit | OPEN. Non-golden |
 
-Item 4 is the only one on a golden case. Everything else can carry a soft uncertainty label if time runs out. The product should never ship an attractive but unverified number.
+Item 4 is the only one touching a golden case, and it is design-safe: the build ships the safe branch when the input is unknown, so nothing is blocked. Everything else can carry a soft uncertainty label if time runs out. The product should never ship an attractive but unverified number.
 
 ---
 
