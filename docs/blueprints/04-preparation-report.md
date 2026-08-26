@@ -1,6 +1,6 @@
 # Nidhi Rakshak — Preparation Report
 
-**Status:** READY for independent implementation from the final handoff SHA.
+**Status:** READY for independent implementation. Foundation SHA: `a26a9b2740fc1e3bbf0b71db915f9b960e6b0463`; final docs SHA is recorded in the handoff after this update.
 
 ## Repo facts
 
