@@ -17,11 +17,26 @@
 
 Read the named IG sections, SC, PRD/journeys, and `docs/DESIGN.md`; paste prompts verbatim; smoke-test; commit only on a green done-check. Start with fixtures. Never wait for Varun’s implementation, recompute diagnosis, create a migration, or invent UI rules outside DESIGN.
 
-## Pre-Flight — already completed on main
+## Pre-Flight — fresh worktree tomorrow
+
+Run these commands from the repository root. The preparation worktrees are removed after tonight; this creates Harshit’s clean worktree from the prepared `main` branch.
+
+```bash
+git checkout main
+git pull --ff-only
+git worktree add ../Nidhi-Rakshak-resolution-recovery feat/resolution-recovery
+cd ../Nidhi-Rakshak-resolution-recovery
+pnpm install --frozen-lockfile
+pnpm preflight
+```
+
+If the branch does not exist on a separate machine, replace the worktree command with `git worktree add ../Nidhi-Rakshak-resolution-recovery -b feat/resolution-recovery <PREPARED_SHA>`.
+
+### Prepared-base checks
 
 - [x] Shared contract, frozen schema/migration, four golden fixtures, fixture provider, deterministic generator, app scaffold, Vercel/Supabase docs, and `lucide-react` are committed.
 - [x] `pnpm test`, `pnpm check`, `pnpm preflight`, `pnpm db:migrate`, and `pnpm build` passed on the prepared base.
-- [ ] In this worktree: `pnpm install --frozen-lockfile`, `pnpm preflight`, and confirm fixture mode.
+- [ ] Confirm fixture mode before starting B1.
 
 ## Session map
 

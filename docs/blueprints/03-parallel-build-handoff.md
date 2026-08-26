@@ -22,6 +22,8 @@ Canonical execution artifacts:
 
 ## Starting commands
 
+The prepared worktrees are intentionally removed after preparation. Tomorrow, create fresh worktrees from `main` at the prepared SHA. The branches already exist, so use the branch form below.
+
 Separate machine:
 
 ```bash
@@ -39,6 +41,17 @@ Same machine:
 git worktree add ../Nidhi-Rakshak-claim-intelligence -b feat/claim-intelligence <PREPARED_SHA>
 git worktree add ../Nidhi-Rakshak-resolution-recovery -b feat/resolution-recovery <PREPARED_SHA>
 ```
+
+If the branches already exist, use:
+
+```bash
+git checkout main
+git pull --ff-only
+git worktree add ../Nidhi-Rakshak-claim-intelligence feat/claim-intelligence
+git worktree add ../Nidhi-Rakshak-resolution-recovery feat/resolution-recovery
+```
+
+Then each developer runs `pnpm install --frozen-lockfile && pnpm preflight` inside their own worktree.
 
 ## Protected boundaries
 

@@ -17,11 +17,26 @@
 
 Read the named IG sections and `docs/DESIGN.md`, paste the prompt verbatim, smoke-test the running app, then commit only when the done-check is green. Do not invent a table, endpoint, shared type, visual token, or cross-domain dependency inside a session. If a shared change is required, stop and follow SC’s contract-change protocol.
 
-## Pre-Flight — already completed on main
+## Pre-Flight — fresh worktree tomorrow
+
+Run these commands from the repository root. The preparation worktrees are removed after tonight; this creates Varun’s clean worktree from the prepared `main` branch.
+
+```bash
+git checkout main
+git pull --ff-only
+git worktree add ../Nidhi-Rakshak-claim-intelligence feat/claim-intelligence
+cd ../Nidhi-Rakshak-claim-intelligence
+pnpm install --frozen-lockfile
+pnpm preflight
+```
+
+If the branch does not exist on a separate machine, replace the worktree command with `git worktree add ../Nidhi-Rakshak-claim-intelligence -b feat/claim-intelligence <PREPARED_SHA>`.
+
+### Prepared-base checks
 
 - [x] Shared contract, frozen schema/migration, fixtures, deterministic 500-case generator, Next scaffold, Vercel/Supabase env docs, and `lucide-react` are committed.
 - [x] `pnpm test`, `pnpm check`, `pnpm preflight`, `pnpm db:migrate`, and `pnpm build` passed on the prepared base.
-- [ ] In this worktree: `pnpm install --frozen-lockfile`, `pnpm preflight`, and confirm `NIDHI_FIXTURE_MODE=true`.
+- [ ] Confirm `NIDHI_FIXTURE_MODE=true` when using fixture mode.
 
 ## Session map
 
