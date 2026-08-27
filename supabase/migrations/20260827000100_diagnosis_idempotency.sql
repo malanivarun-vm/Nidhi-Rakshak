@@ -1,0 +1,3 @@
+ALTER TABLE "diagnosis_runs" ADD COLUMN "idempotency_key" varchar(200) NOT NULL;
+--> statement-breakpoint
+CREATE UNIQUE INDEX "diagnosis_runs_case_idempotency_key_idx" ON "diagnosis_runs" USING btree ("case_id", "idempotency_key");

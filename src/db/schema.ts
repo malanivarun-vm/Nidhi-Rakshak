@@ -130,6 +130,7 @@ export const diagnosisRuns = pgTable(
     caseId: uuid("case_id")
       .notNull()
       .references(() => rescueCases.id, { onDelete: "restrict" }),
+    idempotencyKey: varchar("idempotency_key", { length: 200 }).notNull(),
     version: integer("version").notNull(),
     status: varchar("status", { length: 24 }).notNull(),
     result: jsonb("result").notNull(),
@@ -141,6 +142,10 @@ export const diagnosisRuns = pgTable(
     uniqueIndex("diagnosis_runs_case_version_idx").on(
       table.caseId,
       table.version,
+    ),
+    uniqueIndex("diagnosis_runs_case_idempotency_key_idx").on(
+      table.caseId,
+      table.idempotencyKey,
     ),
   ],
 );

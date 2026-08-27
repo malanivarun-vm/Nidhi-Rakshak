@@ -1,11 +1,10 @@
-export default function PreparationPage() {
+import { Suspense } from "react";
+import { DiagnosisExperience } from "../src/features/claim-intelligence/diagnosis-experience";
+
+export default function ClaimIntelligencePage() {
   return (
-    <main>
-      <h1>Nidhi Rakshak</h1>
-      <p>
-        Prepared foundation. Feature journeys are built from the Claim
-        Intelligence and Resolution &amp; Claim Recovery blueprints.
-      </p>
-    </main>
+    <Suspense fallback={null}>
+      <DiagnosisExperience />
+    </Suspense>
   );
 }
