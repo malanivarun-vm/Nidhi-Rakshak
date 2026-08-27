@@ -1,12 +1,25 @@
 "use client";
 
-import { ArrowRight, Camera, RefreshCw } from "lucide-react";
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  Camera,
+  CheckCircle2,
+  Clock3,
+  GitMerge,
+  RefreshCw,
+  Scale,
+  ShieldCheck,
+  Upload,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DiagnosisResult,
   type DiagnosisResult as DiagnosisResultType,
   ErrorEnvelope,
+  RescueCaseSummary,
+  type RescueCaseSummary as RescueCaseSummaryType,
 } from "../../domain/contracts";
 import { GOLDEN_FIXTURES } from "../../domain/golden-fixtures";
 import {
@@ -52,8 +65,8 @@ const familyCases: Record<FamilyKey, { title: string; reason: string }> = {
     reason: "Run supported checks before you submit.",
   },
 };
-const caseRows = Object.values(GOLDEN_FIXTURES).map((fixture) => ({
-  id: fixture.caseId,
+const fallbackCaseRows = Object.values(GOLDEN_FIXTURES).map((fixture) => ({
+  caseId: fixture.caseId,
   title:
     fixture.journeyType === "MISMATCH"
       ? "Name differs across records"
@@ -64,6 +77,7 @@ const caseRows = Object.values(GOLDEN_FIXTURES).map((fixture) => ({
           : "Rejection needs more evidence",
   reason: fixture.problemSummary,
 }));
+type CaseRow = Pick<RescueCaseSummaryType, "caseId" | "title" | "reason">;
 
 const epfoMessageFor = (code: string) =>
   ({
@@ -95,6 +109,59 @@ function EvidenceRequest({
   onDone,
 }: { onBack: () => void; onDone: () => void }) {
   const [captured, setCaptured] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [fileName, setFileName] = useState("");
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const stopCamera = () => {
+    for (const track of streamRef.current?.getTracks() ?? []) track.stop();
+    streamRef.current = null;
+  };
+
+  useEffect(() => {
+    if (!cameraOpen || !videoRef.current || !streamRef.current) return;
+    videoRef.current.srcObject = streamRef.current;
+    void videoRef.current.play();
+  }, [cameraOpen]);
+  useEffect(
+    () => () => {
+      for (const track of streamRef.current?.getTracks() ?? []) track.stop();
+    },
+    [],
+  );
+  const openCamera = async () => {
+    setCameraError("");
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(
+        "Camera access is not available here. Upload the document instead.",
+      );
+      return;
+    }
+    try {
+      streamRef.current = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false,
+      });
+      setCameraOpen(true);
+    } catch {
+      setCameraError(
+        "We could not open the camera. Upload the document instead.",
+      );
+    }
+  };
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0);
+    stopCamera();
+    setCameraOpen(false);
+    setFileName("Photo captured from camera");
+    setCaptured(true);
+  };
   return (
     <div className={s.screen}>
       <Header onBack={onBack} />
@@ -113,21 +180,52 @@ function EvidenceRequest({
             <li>Cover unrelated personal details.</li>
           </ol>
         </Card>
-        <div className={s.capture} aria-label="Document capture frame" />
+        <div className={s.capture} aria-label="Document capture frame">
+          {cameraOpen && (
+            <video
+              ref={videoRef}
+              className={s.captureVideo}
+              aria-label="Live document camera"
+              autoPlay
+              muted
+              playsInline
+            />
+          )}
+          {cameraOpen && (
+            <button
+              className={s.captureButton}
+              onClick={capturePhoto}
+              type="button"
+            >
+              Capture document
+            </button>
+          )}
+        </div>
+        {cameraError && (
+          <Alert tone="warn" title="Camera unavailable">
+            {cameraError}
+          </Alert>
+        )}
         {!captured ? (
           <>
             <Cta
               label="Take a photo"
               icon={<Camera size={18} />}
-              onClick={() => setCaptured(true)}
+              onClick={() => void openCamera()}
             />
-            <button
-              className={s.secondary}
-              onClick={() => setCaptured(true)}
-              type="button"
-            >
-              Upload document instead
-            </button>
+            <label className={s.uploadButton}>
+              <Upload size={17} /> Upload document instead
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  setFileName(file.name);
+                  setCaptured(true);
+                }}
+              />
+            </label>
           </>
         ) : (
           <>
@@ -136,6 +234,7 @@ function EvidenceRequest({
                 The document appears to show a rejection message, but we still
                 need your confirmation.
               </p>
+              {fileName && <p className={s.fileName}>{fileName}</p>}
               <p className={s.value}>Discrepancy in the claim record</p>
             </Card>
             <Cta label="Yes, this is correct" onClick={onDone} />
@@ -285,11 +384,47 @@ export function DiagnosisExperience() {
   const router = useRouter();
   const params = useSearchParams();
   const queryCase = params.get("case");
-  const [screen, setScreen] = useState<Screen>(queryCase ? "ENTRY" : "LIST");
+  const [screen, setScreen] = useState<Screen>("ENTRY");
   const [caseId, setCaseId] = useState(queryCase ?? "");
   const [diagnosis, setDiagnosis] = useState<DiagnosisResultType>();
   const [error, setError] = useState("");
   const [family, setFamily] = useState<FamilyKey>();
+  const [resumeCaseId, setResumeCaseId] = useState<string>();
+  const [caseRows, setCaseRows] = useState<CaseRow[]>(fallbackCaseRows);
+  const [caseListState, setCaseListState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [caseListError, setCaseListError] = useState("");
+  const loadCaseList = useCallback(async () => {
+    setCaseListState("loading");
+    setCaseListError("");
+    try {
+      const response = await fetch("/api/rescue-cases", { cache: "no-store" });
+      const body: unknown = await response.json();
+      if (!response.ok) {
+        const parsedError = ErrorEnvelope.safeParse(body);
+        throw new Error(
+          parsedError.success
+            ? parsedError.data.error.message
+            : "We couldn’t load your claims.",
+        );
+      }
+      const parsed = RescueCaseSummary.array().parse(
+        (body as { data: { cases: unknown } }).data.cases,
+      );
+      setCaseRows(
+        parsed.map(({ caseId, title, reason }) => ({ caseId, title, reason })),
+      );
+      setCaseListState("ready");
+    } catch (caught) {
+      setCaseListError(
+        caught instanceof Error
+          ? caught.message
+          : "We couldn’t load your claims.",
+      );
+      setCaseListState("error");
+    }
+  }, []);
   const load = useCallback(async () => {
     setScreen("LOADING");
     setError("");
@@ -311,25 +446,151 @@ export function DiagnosisExperience() {
   useEffect(() => {
     if (queryCase) void load();
   }, [queryCase, load]);
+  useEffect(() => {
+    if (queryCase) return;
+    void loadCaseList();
+    const lastCase = localStorage.getItem("nidhi-rakshak:last-diagnosis-case");
+    setResumeCaseId(lastCase ?? undefined);
+    if (localStorage.getItem("nidhi-rakshak:entry-seen") === "true")
+      setScreen("LIST");
+  }, [queryCase, loadCaseList]);
   if (family)
     return <FamilyScreen kind={family} onBack={() => setFamily(undefined)} />;
-  if (screen === "LIST")
+  if (screen === "ENTRY" && !caseId)
+    return (
+      <div className={s.screen}>
+        <Header />
+        <main className={s.entryBody}>
+          <div className={s.entryMark} aria-hidden="true">
+            <img src="/assets/logo.png" alt="" />
+          </div>
+          <p className={s.eyebrow}>Claim rescue</p>
+          <h1 className={s.h1}>
+            Understand what happened before you change anything.
+          </h1>
+          <p className={s.sub}>
+            Nidhi Rakshak reads the records behind a rejected PF claim and shows
+            the safest next step in plain language.
+          </p>
+          <div className={s.entryPromises}>
+            <div className={s.entryPromise}>
+              <CheckCircle2 size={19} aria-hidden="true" />
+              <span>See which record caused the problem</span>
+            </div>
+            <div className={s.entryPromise}>
+              <CheckCircle2 size={19} aria-hidden="true" />
+              <span>Know who needs to act next</span>
+            </div>
+            <div className={s.entryPromise}>
+              <CheckCircle2 size={19} aria-hidden="true" />
+              <span>Preview changes before you make them</span>
+            </div>
+          </div>
+          <Cta
+            label="Understand a rejected claim"
+            onClick={() => {
+              localStorage.setItem("nidhi-rakshak:entry-seen", "true");
+              setScreen("LIST");
+            }}
+          />
+          <p className={s.entryTrust}>
+            Simulated prototype. Nothing changes in EPFO.
+          </p>
+        </main>
+      </div>
+    );
+  if (screen === "LIST") {
+    if (caseListState === "loading")
+      return (
+        <div className={s.screen}>
+          <Header />
+          <div className={s.body}>
+            <p className={s.eyebrow}>Claim rescue</p>
+            <h1 className={s.h1}>Loading your claims…</h1>
+            <p className={s.sub}>
+              We’re retrieving the claims attached to your account.
+            </p>
+          </div>
+        </div>
+      );
+    if (caseListState === "error")
+      return (
+        <div className={s.screen}>
+          <Header />
+          <div className={s.body}>
+            <p className={s.eyebrow}>Your claims</p>
+            <h1 className={s.h1}>Your claims are still safe.</h1>
+            <p className={s.sub}>{caseListError}</p>
+            <Cta
+              label="Try again"
+              icon={<RefreshCw size={18} />}
+              onClick={() => void loadCaseList()}
+            />
+          </div>
+        </div>
+      );
+    if (caseRows.length === 0)
+      return (
+        <div className={s.screen}>
+          <Header />
+          <div className={s.body}>
+            <p className={s.eyebrow}>Your claims</p>
+            <h1 className={s.h1}>There are no rejected claims to review.</h1>
+            <p className={s.sub}>
+              When a claim needs help, it will appear here.
+            </p>
+          </div>
+        </div>
+      );
     return (
       <div className={s.screen}>
         <Header />
         <div className={s.shell}>
           <div className={s.body}>
-            <p className={s.eyebrow}>Your rejected claims</p>
-            <h1 className={s.h1}>Let’s understand what happened.</h1>
+            <p className={s.eyebrow}>Claim rescue</p>
+            <h1 className={s.h1}>Find the next safe step.</h1>
             <p className={s.sub}>
-              Pick a claim. We’ll use the details already attached to it.
+              Choose a rejected claim. We’ll use the details already attached to
+              it and explain what to do next.
             </p>
+            {resumeCaseId && (
+              <section className={s.resume} aria-labelledby="resume-title">
+                <div className={s.resumeTopline}>
+                  <span className={s.resumeLabel}>
+                    Continue your last check
+                  </span>
+                  <CheckCircle2 size={16} aria-hidden="true" />
+                </div>
+                <h2 id="resume-title">
+                  {caseRows.find((row) => row.caseId === resumeCaseId)?.title ??
+                    "Your claim"}
+                </h2>
+                <p>
+                  Open this claim again with the details already attached to it.
+                  Nothing has changed in EPFO.
+                </p>
+                <button
+                  className={s.resumeAction}
+                  onClick={() => {
+                    setCaseId(resumeCaseId);
+                    setScreen("ENTRY");
+                  }}
+                  type="button"
+                >
+                  Continue with this claim <ArrowRight size={17} />
+                </button>
+              </section>
+            )}
+            <div className={s.sectionHeading}>
+              <h2>Your rejected claims</h2>
+              <span>{caseRows.length} to review</span>
+            </div>
             {caseRows.map((row) => (
               <button
                 className={s.case}
-                key={row.id}
+                key={row.caseId}
                 onClick={() => {
-                  setCaseId(row.id);
+                  setCaseId(row.caseId);
                   setScreen("ENTRY");
                 }}
                 type="button"
@@ -343,46 +604,84 @@ export function DiagnosisExperience() {
               </button>
             ))}
             <Card title="More checks">
-              <button
-                className={s.secondary}
-                onClick={() => setFamily("service")}
-                type="button"
-              >
-                Service history
-              </button>
-              <button
-                className={s.secondary}
-                onClick={() => setFamily("eligibility")}
-                type="button"
-              >
-                Eligibility rules
-              </button>
-              <button
-                className={s.secondary}
-                onClick={() => setFamily("consolidation")}
-                type="button"
-              >
-                Link old PF record
-              </button>
-              <button
-                className={s.secondary}
-                onClick={() => setFamily("pending")}
-                type="button"
-              >
-                Check an existing process
-              </button>
-              <button
-                className={s.secondary}
-                onClick={() => setFamily("preflight")}
-                type="button"
-              >
-                Check my claim before filing
-              </button>
+              <div className={s.checkList}>
+                <button
+                  className={s.checkItem}
+                  onClick={() => setFamily("service")}
+                  type="button"
+                >
+                  <span className={s.checkIcon}>
+                    <BriefcaseBusiness size={17} aria-hidden="true" />
+                  </span>
+                  <span className={s.checkCopy}>
+                    <strong>Service history</strong>
+                    <small>Check for overlapping employment dates</small>
+                  </span>
+                  <ArrowRight size={17} aria-hidden="true" />
+                </button>
+                <button
+                  className={s.checkItem}
+                  onClick={() => setFamily("eligibility")}
+                  type="button"
+                >
+                  <span className={s.checkIcon}>
+                    <Scale size={17} aria-hidden="true" />
+                  </span>
+                  <span className={s.checkCopy}>
+                    <strong>Eligibility rules</strong>
+                    <small>See whether a rule limits your claim</small>
+                  </span>
+                  <ArrowRight size={17} aria-hidden="true" />
+                </button>
+                <button
+                  className={s.checkItem}
+                  onClick={() => setFamily("consolidation")}
+                  type="button"
+                >
+                  <span className={s.checkIcon}>
+                    <GitMerge size={17} aria-hidden="true" />
+                  </span>
+                  <span className={s.checkCopy}>
+                    <strong>Link an old PF record</strong>
+                    <small>Bring an older member ID into view</small>
+                  </span>
+                  <ArrowRight size={17} aria-hidden="true" />
+                </button>
+                <button
+                  className={s.checkItem}
+                  onClick={() => setFamily("pending")}
+                  type="button"
+                >
+                  <span className={s.checkIcon}>
+                    <Clock3 size={17} aria-hidden="true" />
+                  </span>
+                  <span className={s.checkCopy}>
+                    <strong>Check an existing process</strong>
+                    <small>Make sure you do not submit twice</small>
+                  </span>
+                  <ArrowRight size={17} aria-hidden="true" />
+                </button>
+                <button
+                  className={s.checkItem}
+                  onClick={() => setFamily("preflight")}
+                  type="button"
+                >
+                  <span className={s.checkIcon}>
+                    <ShieldCheck size={17} aria-hidden="true" />
+                  </span>
+                  <span className={s.checkCopy}>
+                    <strong>Check before filing</strong>
+                    <small>Run supported checks before you submit</small>
+                  </span>
+                  <ArrowRight size={17} aria-hidden="true" />
+                </button>
+              </div>
             </Card>
           </div>
         </div>
       </div>
     );
+  }
   if (screen === "ENTRY")
     return (
       <div className={s.screen}>

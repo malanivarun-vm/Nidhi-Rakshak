@@ -52,6 +52,8 @@ export const supportStatusEnum = pgEnum("support_status", [
 
 export const claims = pgTable("claims", {
   id: uuid("id").defaultRandom().primaryKey(),
+  memberRef: varchar("member_ref", { length: 80 }).notNull(),
+  pfAccountRef: varchar("pf_account_ref", { length: 80 }).notNull(),
   externalRef: varchar("external_ref", { length: 80 }).notNull().unique(),
   claimType: varchar("claim_type", { length: 40 }).notNull(),
   submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull(),

@@ -8,7 +8,10 @@ import {
 import { GET as getCase } from "../../../app/api/rescue-cases/[caseId]/route";
 import { GET as getTimeline } from "../../../app/api/rescue-cases/[caseId]/timeline/route";
 import { GET as getVerdict } from "../../../app/api/rescue-cases/[caseId]/verdict/route";
-import { POST as createCase } from "../../../app/api/rescue-cases/route";
+import {
+  POST as createCase,
+  GET as getCaseList,
+} from "../../../app/api/rescue-cases/route";
 import { resetClaimApiStore, stableUuid } from "./api";
 
 const caseId = "case-golden-fight-relation-name";
@@ -25,6 +28,13 @@ describe("Claim Intelligence API", () => {
   beforeEach(() => {
     process.env.NIDHI_FIXTURE_MODE = "true";
     resetClaimApiStore();
+  });
+
+  it("lists the four golden cases in fixture mode", async () => {
+    const response = await getCaseList();
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.cases).toHaveLength(4);
   });
 
   it("creates and reads a fixture rescue case idempotently", async () => {

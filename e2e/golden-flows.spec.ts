@@ -17,6 +17,16 @@ test.describe("golden resolution journeys", () => {
     page,
   }) => {
     await page.goto("/");
+    await expect(
+      page.getByRole("heading", {
+        name: /Understand what happened before you change anything/,
+      }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: /Understand a rejected claim/ })
+      .click();
+    await expect(page.getByText("Your rejected claims")).toBeVisible();
+    await page.reload();
     await expect(page.getByText("Your rejected claims")).toBeVisible();
     await page
       .getByRole("button", { name: /Name differs across records/ })
@@ -35,7 +45,11 @@ test.describe("golden resolution journeys", () => {
     await page
       .getByRole("button", { name: /Understand this rejection/ })
       .click();
-    await page.getByRole("button", { name: /Take a photo/ }).click();
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "rejection.png",
+      mimeType: "image/png",
+      buffer: Buffer.from("synthetic evidence"),
+    });
     await expect(page.getByText("What we found")).toBeVisible();
     await page.getByRole("button", { name: /Yes, this is correct/ }).click();
     await expect(page.getByText("Your rejected claims")).toBeVisible();
@@ -45,7 +59,7 @@ test.describe("golden resolution journeys", () => {
     await page.getByRole("button", { name: /Eligibility rules/ }).click();
     await expect(page.getByText("Your details are okay.")).toBeVisible();
     await page.getByRole("button", { name: /Back/ }).click();
-    await page.getByRole("button", { name: /Link old PF record/ }).click();
+    await page.getByRole("button", { name: /Link an old PF record/ }).click();
     await expect(page.getByText("Two PF records need linking")).toBeVisible();
     await page.getByRole("button", { name: /Back/ }).click();
     await page
@@ -55,9 +69,7 @@ test.describe("golden resolution journeys", () => {
       page.getByText("Doing nothing is the right move."),
     ).toBeVisible();
     await page.getByRole("button", { name: /Back/ }).click();
-    await page
-      .getByRole("button", { name: /Check my claim before filing/ })
-      .click();
+    await page.getByRole("button", { name: /Check before filing/ }).click();
     await page.getByRole("button", { name: /Run claim check/ }).click();
     await expect(
       page.getByText(/pre-flight result is simulated/),

@@ -88,6 +88,16 @@ export const DiagnosisResult = z.object({
 });
 export type DiagnosisResult = z.infer<typeof DiagnosisResult>;
 
+export const RescueCaseSummary = z.object({
+  caseId: z.string().min(1),
+  claimType: z.string().min(1),
+  submittedAt: z.string().datetime(),
+  status: CaseStatus,
+  title: z.string().min(1),
+  reason: z.string().min(1),
+});
+export type RescueCaseSummary = z.infer<typeof RescueCaseSummary>;
+
 export const ErrorEnvelope = z.object({
   error: z.object({
     code: z.string(),

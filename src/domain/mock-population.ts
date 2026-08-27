@@ -3,12 +3,16 @@ import { GOLDEN_FIXTURES } from "./golden-fixtures";
 
 export type SyntheticCase = {
   caseId: string;
+  memberRef: string;
+  pfAccountRef: string;
   rejectionCode: string;
   journeyType: JourneyType;
   verdict: Verdict;
   golden: boolean;
   syntheticMemberRef: string;
 };
+
+export const DEMO_MEMBER_REF = "demo-member-001";
 
 const distribution: Array<[JourneyType, string, Verdict]> = [
   ["MISMATCH", "KYC_NAME_MISMATCH", "FIX"],
@@ -27,8 +31,10 @@ export function generateSyntheticCases(
 ): SyntheticCase[] {
   if (!Number.isInteger(count) || count < 4)
     throw new Error("count must be an integer >= 4");
-  const cases = Object.values(GOLDEN_FIXTURES).map((fixture) => ({
+  const cases = Object.values(GOLDEN_FIXTURES).map((fixture, index) => ({
     caseId: fixture.caseId,
+    memberRef: DEMO_MEMBER_REF,
+    pfAccountRef: `PF-DEMO-${String(index + 1).padStart(2, "0")}`,
     rejectionCode: fixture.rejectionCode,
     journeyType: fixture.journeyType,
     verdict: fixture.verdict ?? "NONE",
@@ -42,6 +48,8 @@ export function generateSyntheticCases(
     const variant = (seed + index * 7919) % 100000;
     cases.push({
       caseId: `case-synthetic-${String(cases.length + 1).padStart(4, "0")}`,
+      memberRef: `synthetic-member-${String(Math.floor(index / 4) + 1).padStart(3, "0")}`,
+      pfAccountRef: `PF-SYNTH-${String(variant).padStart(5, "0")}`,
       rejectionCode,
       journeyType,
       verdict,

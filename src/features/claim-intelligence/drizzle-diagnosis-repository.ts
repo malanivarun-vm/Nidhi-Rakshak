@@ -12,9 +12,7 @@ export function createDrizzleDiagnosisRepository(
       const [row] = await database
         .select({ result: diagnosisRuns.result })
         .from(diagnosisRuns)
-        .where(
-          sql`${diagnosisRuns.result}->>'caseId' = ${caseId} OR ${diagnosisRuns.caseId} = ${caseId}`,
-        )
+        .where(sql`${diagnosisRuns.result}->>'caseId' = ${caseId}`)
         .orderBy(desc(diagnosisRuns.version))
         .limit(1);
 

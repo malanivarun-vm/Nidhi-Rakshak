@@ -154,7 +154,11 @@ export function Ownership({ diagnosis }: { diagnosis: DiagnosisResult }) {
           <div className={s.ownerLabel}>Who acts next</div>
           <h2>
             {ownerLabel(diagnosis.owner)}
-            {diagnosis.owner === "NONE" ? "" : " needs to act."}
+            {diagnosis.owner === "NONE"
+              ? ""
+              : diagnosis.owner === "MEMBER"
+                ? " need to act."
+                : " needs to act."}
           </h2>
           <p>{diagnosis.blocker?.reason ?? diagnosis.recommendedAction}</p>
         </div>

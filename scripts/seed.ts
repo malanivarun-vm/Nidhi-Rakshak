@@ -20,12 +20,10 @@ const databaseUrl =
   "postgresql://postgres:postgres@127.0.0.1:55422/postgres";
 
 if (
-  process.env.NODE_ENV === "production" ||
-  process.env.ALLOW_DEMO_SEED === "true"
+  process.env.NODE_ENV === "production" &&
+  process.env.ALLOW_DEMO_SEED !== "true"
 )
-  throw new Error(
-    "Refusing to seed production or explicitly unsafe environment.",
-  );
+  throw new Error("Refusing to seed production without ALLOW_DEMO_SEED=true.");
 if (!Number.isInteger(count) || count < 4)
   throw new Error("--count must be an integer >= 4");
 if (!Number.isInteger(seed)) throw new Error("--seed must be an integer");
@@ -45,8 +43,14 @@ async function seedDatabase() {
       );
     for (const item of cases) {
       const claim = await client.query(
-        "INSERT INTO claims (external_ref, claim_type, submitted_at) VALUES ($1, $2, $3) RETURNING id",
-        [`${item.caseId}-claim`, "WITHDRAWAL", "2026-08-27T00:00:00Z"],
+        "INSERT INTO claims (member_ref, pf_account_ref, external_ref, claim_type, submitted_at) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        [
+          item.memberRef,
+          item.pfAccountRef,
+          `${item.caseId}-claim`,
+          "WITHDRAWAL",
+          "2026-08-27T00:00:00Z",
+        ],
       );
       const rejection = await client.query(
         "INSERT INTO claim_rejections (claim_id, raw_text, code) VALUES ($1, $2, $3) RETURNING id",
@@ -99,8 +103,14 @@ async function seedDatabase() {
         version: 1,
       };
       const diagnosis = await client.query(
-        "INSERT INTO diagnosis_runs (case_id, version, status, result) VALUES ($1, $2, $3, $4) RETURNING id",
-        [rescueCase.rows[0].id, 1, result.status, result],
+        "INSERT INTO diagnosis_runs (case_id, idempotency_key, version, status, result) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        [
+          rescueCase.rows[0].id,
+          `${item.caseId}:diagnosis:v1`,
+          1,
+          result.status,
+          result,
+        ],
       );
       await client.query(
         "INSERT INTO evidence_items (case_id, source, label, state, provenance) VALUES ($1, $2, $3, $4, $5)",

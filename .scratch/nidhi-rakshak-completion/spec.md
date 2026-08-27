@@ -17,6 +17,8 @@ Keep the four golden cases fixture-backed and deterministic, unify both features
 
 ### Display and navigation rules
 
+- On first visit, show a short product entry screen with one primary action: understand a rejected claim. After continuing, open the claim workspace. Returning visits skip the entry screen and open the workspace directly.
+- The entry choice is stored locally only for this prototype. Clearing local storage shows the entry again.
 - `/` opens a centered case list. Each of the four golden cases and representative J4-J7/pre-flight entries is reachable without editing the URL.
 - Selecting a golden case opens a compact claim entry, then diagnosis. Supported diagnosis ends in `/resolution/<caseId>`; unsupported or evidence-needed cases stay on the safe evidence/refusal path.
 - Resolution never repeats the full diagnosis. It starts at the first action: Fight simulation, Fix simulation/correction route, Forward ownership/handoff, or refusal fallback.
