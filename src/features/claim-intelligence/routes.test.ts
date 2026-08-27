@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GET as getRescueContext } from "../../../app/api/claims/[claimId]/rescue-context/route";
 import { GET } from "../../../app/api/rescue-cases/[caseId]/diagnosis/route";
 import { DiagnosisResult, ErrorEnvelope } from "../../domain/contracts";
+import { GOLDEN_FIXTURES } from "../../domain/golden-fixtures";
 
 function restoreFixtureMode(previousFixtureMode: string | undefined) {
   if (previousFixtureMode === undefined) {
@@ -50,6 +51,26 @@ describe("diagnosis route", () => {
           caseId: "case-golden-fight-relation-name",
         },
       );
+    } finally {
+      restoreFixtureMode(previousFixtureMode);
+    }
+  });
+
+  it("returns every frozen golden diagnosis unchanged through the API", async () => {
+    const previousFixtureMode = process.env.NIDHI_FIXTURE_MODE;
+    process.env.NIDHI_FIXTURE_MODE = "true";
+
+    try {
+      for (const fixture of Object.values(GOLDEN_FIXTURES)) {
+        const response = await GET(new Request("http://localhost"), {
+          params: Promise.resolve({ caseId: fixture.caseId }),
+        });
+
+        expect(response.status).toBe(200);
+        expect(DiagnosisResult.parse((await response.json()).data)).toEqual(
+          fixture,
+        );
+      }
     } finally {
       restoreFixtureMode(previousFixtureMode);
     }
