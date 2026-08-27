@@ -65,6 +65,14 @@ const caseRows = Object.values(GOLDEN_FIXTURES).map((fixture) => ({
   reason: fixture.problemSummary,
 }));
 
+const epfoMessageFor = (code: string) =>
+  ({
+    RELATION_NAME_MISMATCH: "Discrepancy in relation name",
+    EXIT_DATE_MISSING: "Date of exit is not available",
+    BANK_DETAILS_INVALID: "Bank account details could not be validated",
+    UNMAPPED_REJECTION: "The rejection message is not supported yet",
+  })[code] ?? "The rejection message is not available";
+
 async function fetchDiagnosis(caseId: string) {
   const response = await fetch(
     `/api/rescue-cases/${encodeURIComponent(caseId)}/diagnosis`,
@@ -86,6 +94,7 @@ function EvidenceRequest({
   onBack,
   onDone,
 }: { onBack: () => void; onDone: () => void }) {
+  const [captured, setCaptured] = useState(false);
   return (
     <div className={s.screen}>
       <Header onBack={onBack} />
@@ -105,14 +114,40 @@ function EvidenceRequest({
           </ol>
         </Card>
         <div className={s.capture} aria-label="Document capture frame" />
-        <Cta
-          label="Take a photo"
-          icon={<Camera size={18} />}
-          onClick={onDone}
-        />
-        <button className={s.secondary} onClick={onDone} type="button">
-          Upload document instead
-        </button>
+        {!captured ? (
+          <>
+            <Cta
+              label="Take a photo"
+              icon={<Camera size={18} />}
+              onClick={() => setCaptured(true)}
+            />
+            <button
+              className={s.secondary}
+              onClick={() => setCaptured(true)}
+              type="button"
+            >
+              Upload document instead
+            </button>
+          </>
+        ) : (
+          <>
+            <Card title="What we found">
+              <p className={s.sub}>
+                The document appears to show a rejection message, but we still
+                need your confirmation.
+              </p>
+              <p className={s.value}>Discrepancy in the claim record</p>
+            </Card>
+            <Cta label="Yes, this is correct" onClick={onDone} />
+            <button
+              className={s.secondary}
+              onClick={() => setCaptured(false)}
+              type="button"
+            >
+              No, try another document
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -515,9 +550,7 @@ export function DiagnosisExperience() {
         )}
         <details className={s.disclosure}>
           <summary>EPFO’s message</summary>
-          <p className={s.sub}>
-            {diagnosis.rejectionCode.replaceAll("_", " ")}
-          </p>
+          <p className={s.sub}>{epfoMessageFor(diagnosis.rejectionCode)}</p>
         </details>
         <details className={s.disclosure}>
           <summary>See the records we used</summary>

@@ -1,28 +1,38 @@
 "use client";
 
 import {
-  ArrowLeft,
   ArrowRight,
   Check,
-  CircleAlert,
   Clock3,
   FileText,
-  Landmark,
   RefreshCw,
-  Send,
-  ShieldCheck,
+  Share2,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import type { ReactNode } from "react";
 import type { DiagnosisResult } from "../../domain/contracts";
-import styles from "./ResolutionExperience.module.css";
+import { selectCorrectionRoute } from "../claim-intelligence/correction-route";
+import {
+  Alert,
+  Card,
+  ConsentBox,
+  Context,
+  CorrectionRouteCard,
+  Cta,
+  Header,
+  LinkButton,
+  Ownership,
+  SimCompare,
+} from "../shared/components";
+import s from "../shared/nidhi.module.css";
 
-type View = "summary" | "simulation" | "consent" | "result" | "tracking";
-interface ApiState {
-  diagnosis?: DiagnosisResult;
-  error?: string;
-  loading: boolean;
-}
+type View =
+  | "simulation"
+  | "route"
+  | "forward"
+  | "consent"
+  | "result"
+  | "tracking"
+  | "refusal";
 interface Artifact {
   kind: string;
   payload: Record<string, unknown>;
@@ -38,54 +48,24 @@ interface Simulation {
 interface Tracking {
   status: string;
   owner: string;
+  currentBlocker?: string;
+  lastAction?: string;
   nextStep: string;
   events: Array<{ toStatus: string; reason: string; createdAt: string }>;
   simulated: boolean;
-  receipt?: Artifact;
-  handoff?: Artifact;
-  recheck?: { outcome: string };
 }
-
-const ownerLabel = (owner: DiagnosisResult["owner"]) =>
-  ({
-    MEMBER: "You",
-    EMPLOYER: "Your previous employer",
-    EPFO: "EPFO",
-    BANK: "Your bank",
-    NONE: "No one",
-  })[owner];
-const headline = (diagnosis: DiagnosisResult) =>
-  diagnosis.status === "UNSUPPORTED"
-    ? "We can’t safely diagnose this rejection yet."
-    : diagnosis.verdict === "FIGHT"
-      ? "Your current details are correct. Don’t change them."
-      : diagnosis.verdict === "FORWARD"
-        ? `${ownerLabel(diagnosis.owner)} needs to fix this.`
-        : diagnosis.verdict === "FIX"
-          ? "One detail needs to be corrected."
-          : "You don’t need to do anything right now.";
-const actionLabel = (diagnosis: DiagnosisResult) =>
-  diagnosis.status === "UNSUPPORTED" || diagnosis.verdict === undefined
-    ? "Get help through EPFO"
-    : diagnosis.verdict === "FIGHT"
-      ? "Resolve this with EPFO"
-      : diagnosis.verdict === "FORWARD"
-        ? "Send this to my employer"
-        : diagnosis.verdict === "FIX"
-          ? "See the safe correction"
-          : "Check again later";
-
-const journeyStorageKey = (caseId: string) =>
-  `nidhi-rakshak:resolution:${caseId}`;
-
 interface SavedJourney {
   artifact?: Artifact;
   outcome?: string;
   tracking?: Tracking;
+  view?: View;
 }
 
+const storageKey = (caseId: string) => `nidhi-rakshak:resolution:${caseId}`;
 const loadDiagnosis = async (caseId: string) => {
-  const response = await fetch(`/api/rescue-cases/${caseId}/resolution`);
+  const response = await fetch(
+    `/api/rescue-cases/${encodeURIComponent(caseId)}/resolution`,
+  );
   if (!response.ok) throw new Error("We couldn’t load the claim details.");
   const body = (await response.json()) as {
     data?: { diagnosis?: DiagnosisResult };
@@ -93,144 +73,164 @@ const loadDiagnosis = async (caseId: string) => {
   return body.data?.diagnosis;
 };
 
-export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
-  const [state, setState] = useState<ApiState>({ loading: true });
-  const [view, setView] = useState<View>("summary");
+export function ResolutionExperience({ caseId }: { caseId: string }) {
+  const [diagnosis, setDiagnosis] = useState<DiagnosisResult>();
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<View>("simulation");
+  const [simulation, setSimulation] = useState<Simulation>();
+  const [artifact, setArtifact] = useState<Artifact>();
+  const [tracking, setTracking] = useState<Tracking>();
+  const [outcome, setOutcome] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [artifact, setArtifact] = useState<Artifact>();
-  const [simulation, setSimulation] = useState<Simulation>();
-  const [recheckOutcome, setRecheckOutcome] = useState<string>();
-  const [tracking, setTracking] = useState<Tracking>();
 
   const load = useCallback(() => {
-    setState({ loading: true });
+    setLoading(true);
+    setError("");
     loadDiagnosis(caseId)
-      .then((diagnosis) => setState({ loading: false, diagnosis }))
-      .catch((error: Error) =>
-        setState({ loading: false, error: error.message }),
-      );
+      .then((result) => {
+        if (!result) throw new Error("No claim details found.");
+        setDiagnosis(result);
+        const first =
+          result.status !== "DIAGNOSED" || !result.verdict
+            ? "refusal"
+            : result.verdict === "FORWARD"
+              ? "forward"
+              : result.verdict === "FIX" || result.verdict === "FIGHT"
+                ? "simulation"
+                : "consent";
+        setView(first);
+      })
+      .catch((caught: unknown) =>
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "We couldn’t load the claim details.",
+        ),
+      )
+      .finally(() => setLoading(false));
   }, [caseId]);
+
   useEffect(() => {
     load();
   }, [load]);
   useEffect(() => {
-    if (state.loading || state.error || !state.diagnosis) return;
-    const saved = window.localStorage.getItem(journeyStorageKey(caseId));
-    if (saved) {
-      try {
-        const journey = JSON.parse(saved) as SavedJourney;
-        if (journey.artifact) setArtifact(journey.artifact);
-        if (journey.outcome) setRecheckOutcome(journey.outcome);
-        if (journey.tracking) setTracking(journey.tracking);
-        if (journey.artifact || journey.outcome || journey.tracking)
-          setView("result");
-      } catch {
-        window.localStorage.removeItem(journeyStorageKey(caseId));
-      }
+    if (!diagnosis || loading || error) return;
+    const raw = window.localStorage.getItem(storageKey(caseId));
+    if (!raw) return;
+    try {
+      const saved = JSON.parse(raw) as SavedJourney;
+      if (saved.artifact) setArtifact(saved.artifact);
+      if (saved.tracking) setTracking(saved.tracking);
+      if (saved.outcome) setOutcome(saved.outcome);
+      if (saved.view) setView(saved.view);
+    } catch {
+      window.localStorage.removeItem(storageKey(caseId));
     }
-    fetch(`/api/rescue-cases/${caseId}/tracking`)
-      .then(async (response) => {
-        if (!response.ok) return;
-        const body = (await response.json()) as {
-          data?: { tracking?: Tracking };
-        };
-        const current = body.data?.tracking;
-        if (current?.events.length) {
-          setTracking(current);
-          if (current.receipt ?? current.handoff)
-            setArtifact(current.receipt ?? current.handoff);
-          if (current.recheck?.outcome)
-            setRecheckOutcome(current.recheck.outcome);
-          const saved = window.localStorage.getItem(journeyStorageKey(caseId));
-          const savedJourney = saved ? (JSON.parse(saved) as SavedJourney) : {};
-          window.localStorage.setItem(
-            journeyStorageKey(caseId),
-            JSON.stringify({
-              ...savedJourney,
-              ...((current.receipt ?? current.handoff)
-                ? { artifact: current.receipt ?? current.handoff }
-                : {}),
-              ...(current.recheck?.outcome
-                ? { outcome: current.recheck.outcome }
-                : {}),
-              tracking: current,
-            } satisfies SavedJourney),
-          );
-          setView("result");
-        }
-      })
-      .catch(() => undefined);
-  }, [caseId, state.diagnosis, state.error, state.loading]);
+  }, [caseId, diagnosis, error, loading]);
 
-  if (state.loading)
-    return (
-      <Shell>
-        <div className={styles.loading}>
-          <RefreshCw size={20} />
-          <p>Checking the details linked to this claim…</p>
-        </div>
-      </Shell>
-    );
-  if (state.error)
-    return (
-      <Shell>
-        <StateCard
-          icon={<CircleAlert />}
-          title={state.error}
-          body="Your case has not changed."
-          action={
-            <button type="button" className={styles.primary} onClick={load}>
-              Try again
-            </button>
-          }
-        />
-      </Shell>
-    );
-  if (!state.diagnosis)
-    return (
-      <Shell>
-        <StateCard
-          title="No claim details found"
-          body="Open Nidhi Rakshak from a rejected claim to continue."
-        />
-      </Shell>
+  const persist = (next: SavedJourney) =>
+    window.localStorage.setItem(storageKey(caseId), JSON.stringify(next));
+  const goBack = () =>
+    setView((current) =>
+      current === "tracking" || current === "result"
+        ? "result"
+        : current === "route" || current === "consent" || current === "forward"
+          ? "simulation"
+          : "simulation",
     );
 
-  const diagnosis = state.diagnosis;
-  const refused = diagnosis.status === "UNSUPPORTED" || !diagnosis.verdict;
+  const runSimulation = async () => {
+    if (!diagnosis) return;
+    if (diagnosis.verdict === "FIGHT") {
+      setSimulation({
+        safety: "UNSAFE",
+        safetyResult: "This change creates more mismatches.",
+        recommendation: "Keep your current details.",
+        blockerDelta: { before: 1, after: 2, change: 1 },
+        proposedChange: {
+          field: "relation_name",
+          before: "RAMESH BADIGER",
+          after: "RAJESH BADIGER",
+        },
+        disclaimer: "Simulation only. No record will be changed.",
+      });
+      return;
+    }
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(
+        `/api/rescue-cases/${encodeURIComponent(caseId)}/simulations`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": crypto.randomUUID(),
+          },
+          body: JSON.stringify({
+            proposedChange: {
+              field: diagnosis.blocker?.field ?? "supported_detail",
+              before: "Current value",
+              after: "Corrected value",
+            },
+            before: { supportedBlockerCount: 1 },
+            after: { supportedBlockerCount: 0 },
+          }),
+        },
+      );
+      const body = (await response.json()) as {
+        data?: { simulation?: Simulation };
+      };
+      if (!response.ok || !body.data?.simulation)
+        throw new Error("We couldn’t simulate this change safely. Try again.");
+      setSimulation(body.data.simulation);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submit = async () => {
+    if (!diagnosis) return;
     setBusy(true);
     setMessage("");
     const key = crypto.randomUUID();
-    let nextArtifact: Artifact | undefined;
     try {
-      const actionType =
-        diagnosis.verdict === "FIX"
-          ? "MEMBER_CORRECTION"
-          : diagnosis.verdict === "NONE"
-            ? "WAIT"
-            : "EPFO_REVIEW";
-      const response = await fetch(`/api/rescue-cases/${caseId}/actions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Idempotency-Key": key },
-        body: JSON.stringify({
-          actionType,
-          consent: {
-            approved: true,
-            text: "I understand this is a simulated action and no external record will be changed.",
+      const response = await fetch(
+        `/api/rescue-cases/${encodeURIComponent(caseId)}/actions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
           },
-          payload: {
-            issue: diagnosis.problemSummary,
-            nextAction: diagnosis.recommendedAction,
-          },
-        }),
-      });
+          body: JSON.stringify({
+            actionType:
+              diagnosis.verdict === "FIX"
+                ? "MEMBER_CORRECTION"
+                : diagnosis.verdict === "NONE"
+                  ? "WAIT"
+                  : "EPFO_REVIEW",
+            consent: {
+              approved: true,
+              text: "I understand this is a simulated action and no external record will be changed.",
+            },
+            payload: {
+              issue: diagnosis.problemSummary,
+              nextAction: diagnosis.recommendedAction,
+            },
+          }),
+        },
+      );
       if (!response.ok)
         throw new Error("We couldn’t save this action. Try again.");
+      let nextArtifact: Artifact | undefined;
       if (diagnosis.verdict === "FORWARD" || diagnosis.verdict === "FIGHT") {
-        const handoffResponse = await fetch(
-          `/api/rescue-cases/${caseId}/handoffs`,
+        const handoff = await fetch(
+          `/api/rescue-cases/${encodeURIComponent(caseId)}/handoffs`,
           {
             method: "POST",
             headers: {
@@ -249,71 +249,46 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
             }),
           },
         );
-        if (!handoffResponse.ok)
+        const body = (await handoff.json()) as {
+          data?: { artifact?: Artifact };
+        };
+        if (!handoff.ok || !body.data?.artifact)
           throw new Error("The package could not be prepared. Try again.");
-        const handoffBody = (await handoffResponse.json()) as {
-          data: { artifact: Artifact };
-        };
-        nextArtifact = handoffBody.data.artifact;
-        setArtifact(nextArtifact);
-      }
-      if (diagnosis.verdict !== "FORWARD") {
-        const receiptResponse = await fetch(
-          `/api/rescue-cases/${caseId}/receipts`,
-          {
-            method: "POST",
-            headers: { "Idempotency-Key": key },
-          },
+        nextArtifact = body.data.artifact;
+      } else if (diagnosis.verdict !== "NONE") {
+        const receipt = await fetch(
+          `/api/rescue-cases/${encodeURIComponent(caseId)}/receipts`,
+          { method: "POST", headers: { "Idempotency-Key": key } },
         );
-        if (!receiptResponse.ok)
-          throw new Error("The case summary could not be prepared. Try again.");
-        const receiptBody = (await receiptResponse.json()) as {
-          data: { receipt: Artifact };
+        const body = (await receipt.json()) as {
+          data?: { receipt?: Artifact };
         };
-        nextArtifact = receiptBody.data.receipt;
-        setArtifact(nextArtifact);
+        if (!receipt.ok || !body.data?.receipt)
+          throw new Error("The case summary could not be prepared. Try again.");
+        nextArtifact = body.data.receipt;
       }
-      window.localStorage.setItem(
-        journeyStorageKey(caseId),
-        JSON.stringify({ artifact: nextArtifact } satisfies SavedJourney),
-      );
-      setView("result");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const runSimulation = async () => {
-    setBusy(true);
-    setMessage("");
-    try {
-      const field = diagnosis.blocker?.field ?? "supported_detail";
-      const response = await fetch(`/api/rescue-cases/${caseId}/simulations`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
-          proposedChange: {
-            field,
-            before: "Current value",
-            after: "Corrected value",
-          },
-          before: { supportedBlockerCount: 1 },
-          after: { supportedBlockerCount: 0 },
-        }),
-      });
-      const body = (await response.json()) as {
-        data?: { simulation?: Simulation };
+      const nextTracking: Tracking = {
+        status: "WAITING",
+        owner: diagnosis.owner,
+        currentBlocker: diagnosis.problemSummary,
+        lastAction: diagnosis.recommendedAction,
+        nextStep:
+          diagnosis.verdict === "FORWARD"
+            ? "Your previous employer reviews the simulated package."
+            : "EPFO reviews the simulated package.",
+        events: [],
+        simulated: true,
       };
-      if (!response.ok || !body.data?.simulation)
-        throw new Error("We couldn’t simulate this change safely. Try again.");
-      setSimulation(body.data.simulation);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Try again.");
+      setArtifact(nextArtifact);
+      setTracking(nextTracking);
+      setView("result");
+      persist({
+        artifact: nextArtifact,
+        tracking: nextTracking,
+        view: "result",
+      });
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "Try again.");
     } finally {
       setBusy(false);
     }
@@ -323,395 +298,214 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/rescue-cases/${caseId}/tracking`);
+      const response = await fetch(
+        `/api/rescue-cases/${encodeURIComponent(caseId)}/tracking`,
+      );
       const body = (await response.json()) as {
         data?: { tracking?: Tracking };
       };
       if (!response.ok || !body.data?.tracking)
         throw new Error("Tracking is unavailable. Try again.");
-      setTracking(body.data.tracking);
-      window.localStorage.setItem(
-        journeyStorageKey(caseId),
-        JSON.stringify({
-          artifact,
-          tracking: body.data.tracking,
-          outcome: recheckOutcome,
-        } satisfies SavedJourney),
-      );
+      const nextTracking =
+        body.data.tracking.events.length > 0
+          ? body.data.tracking
+          : (tracking ?? body.data.tracking);
+      setTracking(nextTracking);
       setView("tracking");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Try again.");
+      persist({
+        artifact,
+        tracking: nextTracking,
+        outcome,
+        view: "tracking",
+      });
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "Try again.");
     } finally {
       setBusy(false);
     }
   };
 
+  const recheck = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(
+        `/api/rescue-cases/${encodeURIComponent(caseId)}/recheck`,
+        { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() } },
+      );
+      const body = (await response.json()) as {
+        data?: { result?: { outcome: string } };
+      };
+      if (!response.ok || !body.data?.result)
+        throw new Error("We couldn’t check this case. Try again.");
+      setOutcome(body.data.result.outcome);
+      persist({
+        artifact,
+        tracking,
+        outcome: body.data.result.outcome,
+        view: "result",
+      });
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading)
+    return (
+      <Shell>
+        <State
+          title="Checking the details linked to this claim…"
+          body="This usually takes a moment."
+        />
+      </Shell>
+    );
+  if (error || !diagnosis)
+    return (
+      <Shell>
+        <State
+          title={error || "No claim details found."}
+          body="Your case has not changed."
+          action={
+            <Cta
+              label="Try again"
+              icon={<RefreshCw size={18} />}
+              onClick={load}
+            />
+          }
+        />
+      </Shell>
+    );
+
   return (
     <Shell>
-      <div className={styles.topline}>
-        <button
-          type="button"
-          className={styles.back}
-          onClick={() =>
-            view === "summary" ? history.back() : setView("summary")
-          }
-        >
-          <ArrowLeft size={17} /> Back
-        </button>
-        <span className={styles.simulated}>SIMULATED PROTOTYPE</span>
-      </div>
-      <div className={styles.context}>
-        <span>Rejected claim</span>
-        <span>Case {caseId.replace("case-golden-", "")}</span>
-      </div>
-      {view === "result" ? (
-        <Result
-          diagnosis={diagnosis}
-          artifact={artifact}
-          outcome={recheckOutcome}
-          onTracking={loadTracking}
-          onRecheck={async () => {
-            setBusy(true);
-            setMessage("");
-            try {
-              const response = await fetch(
-                `/api/rescue-cases/${caseId}/recheck`,
-                {
-                  method: "POST",
-                  headers: { "Idempotency-Key": crypto.randomUUID() },
-                },
-              );
-              const body = (await response.json()) as {
-                data?: { result?: { outcome: string } };
-              };
-              if (!response.ok || !body.data?.result)
-                throw new Error("We couldn’t check this case. Try again.");
-              setRecheckOutcome(body.data.result.outcome);
-              const saved = window.localStorage.getItem(
-                journeyStorageKey(caseId),
-              );
-              const journey = saved ? (JSON.parse(saved) as SavedJourney) : {};
-              window.localStorage.setItem(
-                journeyStorageKey(caseId),
-                JSON.stringify({
-                  ...journey,
-                  outcome: body.data.result.outcome,
-                } satisfies SavedJourney),
-              );
-            } catch (error) {
-              setMessage(error instanceof Error ? error.message : "Try again.");
-            } finally {
-              setBusy(false);
-            }
-          }}
-          busy={busy}
-        />
-      ) : view === "tracking" ? (
-        <TrackingView
-          tracking={tracking}
-          message={message}
-          onBack={() => setView("result")}
-        />
-      ) : view === "simulation" ? (
+      <Header onBack={() => history.back()} />
+      <Context value={`Resolving: ${diagnosis.problemSummary}`} />
+      {view === "simulation" && (
         <SimulationView
           diagnosis={diagnosis}
           simulation={simulation}
           busy={busy}
           message={message}
-          onSimulate={runSimulation}
-          onContinue={() => simulation?.safety === "SAFE" && setView("consent")}
-          onBack={() => setView("summary")}
+          onSimulate={() => void runSimulation()}
+          onContinue={() =>
+            setView(diagnosis.verdict === "FIX" ? "route" : "consent")
+          }
+          onBack={goBack}
         />
-      ) : view === "consent" ? (
-        <Consent
+      )}
+      {view === "route" && (
+        <div className={s.body}>
+          <p className={s.eyebrow}>Correction route</p>
+          <h1 className={s.h1}>
+            Here is the safest way to correct this detail.
+          </h1>
+          <CorrectionRouteCard
+            route={selectCorrectionRoute({
+              aadhaarValidated: true,
+              uanIssuedBefore2017: false,
+              fieldLevel: "UAN_PROFILE",
+              priorEstablishmentStatus: undefined,
+            })}
+          />
+          <Cta label="Continue to consent" onClick={() => setView("consent")} />
+          <LinkButton label="Go back" onClick={goBack} />
+        </div>
+      )}
+      {view === "forward" && (
+        <div className={s.body}>
+          <p className={s.eyebrow}>Who acts next</p>
+          <h1 className={s.h1}>Your previous employer needs to update this.</h1>
+          <Ownership diagnosis={diagnosis} />
+          <Card title="Why this route">
+            <p className={s.sub}>
+              The missing service detail belongs to a previous establishment.
+              You cannot add it from your current account.
+            </p>
+          </Card>
+          <Cta
+            label="Send this to my employer"
+            onClick={() => setView("consent")}
+          />
+          <LinkButton label="Go back" onClick={goBack} />
+        </div>
+      )}
+      {view === "consent" && (
+        <ConsentView
           diagnosis={diagnosis}
           busy={busy}
           message={message}
-          onApprove={submit}
-          onBack={() => setView("summary")}
+          onApprove={() => void submit()}
+          onBack={goBack}
         />
-      ) : (
-        <Summary
+      )}
+      {view === "result" && (
+        <ResultView
           diagnosis={diagnosis}
-          refused={refused}
-          onPrimary={() =>
-            refused
-              ? setMessage(
-                  "This rejection is not supported yet. Get help through EPFO.",
-                )
-              : diagnosis.verdict === "FIX"
-                ? setView("simulation")
-                : setView("consent")
-          }
+          artifact={artifact}
+          outcome={outcome}
+          busy={busy}
           message={message}
+          onTracking={() => void loadTracking()}
+          onRecheck={() => void recheck()}
+          onShare={() => void shareArtifact(artifact)}
         />
+      )}
+      {view === "tracking" && (
+        <TrackingView
+          tracking={tracking}
+          message={message}
+          onBack={() => setView("result")}
+        />
+      )}
+      {view === "refusal" && (
+        <div className={s.body}>
+          <p className={s.eyebrow}>Safe fallback</p>
+          <h1 className={s.h1}>
+            We cannot safely diagnose this rejection yet.
+          </h1>
+          <p className={s.sub}>{diagnosis.problemSummary}</p>
+          <Alert tone="info" title="We won’t guess.">
+            The information available is not enough to tell you what should be
+            changed.
+          </Alert>
+          <Cta
+            label="Get help through EPFO"
+            onClick={() =>
+              setMessage(
+                "This rejection is not supported yet. Get help through EPFO.",
+              )
+            }
+          />
+          {message && <p className={s.sub}>{message}</p>}
+        </div>
       )}
     </Shell>
   );
-};
+}
 
 const Shell = ({ children }: { children: React.ReactNode }) => (
-  <main className={styles.page}>
-    <div className={styles.shell}>
-      <header>
-        <img
-          src="/assets/logo.png"
-          alt="Nidhi Rakshak"
-          className={styles.logo}
-        />
-      </header>
-      {children}
-      <footer className={styles.footer}>
-        No EPFO record will be changed in this prototype.
-      </footer>
-    </div>
+  <main className={s.screen}>
+    {children}
+    <footer className={s.footer}>
+      No EPFO record will be changed in this prototype.
+    </footer>
   </main>
 );
-const Summary = ({
-  diagnosis,
-  refused,
-  onPrimary,
-  message,
-}: {
-  diagnosis: DiagnosisResult;
-  refused: boolean;
-  onPrimary: () => void;
-  message: string;
-}) => (
-  <>
-    <section className={styles.answer}>
-      <div className={styles.answerIcon}>
-        {refused ? (
-          <CircleAlert />
-        ) : diagnosis.verdict === "FIGHT" ? (
-          <ShieldCheck />
-        ) : diagnosis.verdict === "FORWARD" ? (
-          <Send />
-        ) : (
-          <Check />
-        )}
-      </div>
-      <p className={styles.eyebrow}>
-        {refused ? "Safe fallback" : "Your next step"}
-      </p>
-      <h1>
-        {refused ? headline(diagnosis) : "Let’s take the safest next step."}
-      </h1>
-      <p>
-        {refused
-          ? diagnosis.problemSummary
-          : `Resolving: ${diagnosis.problemSummary}`}
-      </p>
-    </section>
-    {diagnosis.verdict === "FIGHT" && (
-      <aside className={styles.preview}>
-        <span className={styles.previewLabel}>
-          TRY BEFORE YOU TOUCH · SIMULATION ONLY
-        </span>
-        <h2>Changing your current name creates more mismatches.</h2>
-        <p>
-          <strong>Before:</strong> 1 mismatch &nbsp; <strong>After:</strong> 2
-          mismatches
-        </p>
-        <p>Keep your current details. No record will be changed here.</p>
-      </aside>
-    )}
-    {diagnosis.doNotTouch.applies && (
-      <aside className={styles.warning}>
-        <CircleAlert />
-        <div>
-          <strong>Do not change your current details.</strong>
-          <p>{diagnosis.doNotTouch.reason}</p>
-        </div>
-      </aside>
-    )}
-    <button type="button" className={styles.primary} onClick={onPrimary}>
-      {actionLabel(diagnosis)} <ArrowRight size={18} />
-    </button>
-    {message && <p className={styles.inlineError}>{message}</p>}
-    {!refused && (
-      <div className={styles.grid}>
-        <InfoCard
-          icon={<Landmark />}
-          label="Who acts next"
-          value={ownerLabel(diagnosis.owner)}
-        />
-        <InfoCard
-          icon={<Clock3 />}
-          label="What happens next"
-          value={diagnosis.recommendedAction}
-        />
-      </div>
-    )}
-    <details className={styles.details}>
-      <summary>See what we checked</summary>
-      <div className={styles.evidence}>
-        {diagnosis.evidence.length ? (
-          diagnosis.evidence.map((item) => (
-            <div key={item.evidenceId}>
-              <strong>{item.label}</strong>
-              <span>
-                {item.state === "VERIFIED"
-                  ? "Checked record"
-                  : "Needs confirmation"}
-              </span>
-            </div>
-          ))
-        ) : (
-          <p>No supporting record is available for this rejection.</p>
-        )}
-        {diagnosis.firstDivergence && (
-          <p>
-            <strong>Where the mismatch starts:</strong>{" "}
-            {diagnosis.firstDivergence.detail}
-          </p>
-        )}
-      </div>
-    </details>
-  </>
+const State = ({
+  title,
+  body,
+  action,
+}: { title: string; body: string; action?: React.ReactNode }) => (
+  <div className={s.body}>
+    <p className={s.eyebrow}>Nidhi Rakshak</p>
+    <h1 className={s.h1}>{title}</h1>
+    <p className={s.sub}>{body}</p>
+    {action}
+  </div>
 );
-const Consent = ({
-  diagnosis,
-  busy,
-  message,
-  onApprove,
-  onBack,
-}: {
-  diagnosis: DiagnosisResult;
-  busy: boolean;
-  message: string;
-  onApprove: () => void;
-  onBack: () => void;
-}) => {
-  const [approved, setApproved] = useState(false);
-  return (
-    <section>
-      <div className={styles.sectionHeading}>
-        <p className={styles.eyebrow}>Before you continue</p>
-        <h1>Here is exactly what will happen.</h1>
-        <p>Review this simulated action before approving it.</p>
-      </div>
-      <div className={styles.preview}>
-        <span className={styles.previewLabel}>SIMULATED ACTION</span>
-        <h2>{actionLabel(diagnosis)}</h2>
-        <p>{diagnosis.recommendedAction}</p>
-        <hr />
-        <p>
-          <strong>What will be shared:</strong> {diagnosis.problemSummary}
-        </p>
-        <p>
-          <strong>What will not happen:</strong> No EPFO, employer, or bank
-          record will be changed.
-        </p>
-      </div>
-      <label className={styles.consent}>
-        <input
-          type="checkbox"
-          checked={approved}
-          onChange={(event) => setApproved(event.target.checked)}
-        />{" "}
-        I understand this is a simulation and approve creating this case
-        package.
-      </label>
-      {message && <p className={styles.inlineError}>{message}</p>}
-      <button
-        type="button"
-        className={styles.primary}
-        disabled={busy || !approved}
-        onClick={onApprove}
-      >
-        {busy ? "Saving…" : "Approve simulated action"} <ArrowRight size={18} />
-      </button>
-      <button type="button" className={styles.secondary} onClick={onBack}>
-        Go back
-      </button>
-    </section>
-  );
-};
-const Result = ({
-  diagnosis,
-  artifact,
-  outcome,
-  onTracking,
-  onRecheck,
-  busy,
-}: {
-  diagnosis: DiagnosisResult;
-  artifact?: Artifact;
-  outcome?: string;
-  onTracking: () => void;
-  onRecheck: () => void;
-  busy: boolean;
-}) => (
-  <section>
-    <div className={styles.answer}>
-      <div className={styles.answerIcon}>
-        {outcome === "RESOLVED" ? <Check /> : <ShieldCheck />}
-      </div>
-      <p className={styles.eyebrow}>
-        {outcome === "RESOLVED"
-          ? "Issue resolved"
-          : outcome === "SAME_BLOCKER"
-            ? "Same issue found"
-            : outcome === "NEW_BLOCKER"
-              ? "New issue found"
-              : diagnosis.verdict === "FORWARD"
-                ? "Package ready"
-                : "Case saved"}
-      </p>
-      <h1>
-        {outcome === "RESOLVED"
-          ? "The issue we found has been resolved."
-          : outcome === "SAME_BLOCKER"
-            ? "This issue is still showing."
-            : outcome === "NEW_BLOCKER"
-              ? "A different issue needs attention."
-              : diagnosis.verdict === "FORWARD"
-                ? "Your employer package is ready."
-                : "Your case summary is ready."}
-      </h1>
-      <p>
-        {outcome === "RESOLVED"
-          ? "This check only covered the supported issue. It does not predict claim approval."
-          : outcome
-            ? "Review the new details before changing anything. No external record was changed."
-            : diagnosis.verdict === "FORWARD"
-              ? "Share this with your previous employer. This prototype has not sent it."
-              : "You can use this summary when you contact EPFO. Nothing was submitted."}
-      </p>
-    </div>
-    {artifact && (
-      <div className={styles.artifact}>
-        <FileText />
-        <div>
-          <strong>
-            {artifact.kind === "EPFO"
-              ? "EPFO review package"
-              : artifact.kind === "RECEIPT"
-                ? "Case summary"
-                : "Employer handoff"}
-          </strong>
-          <span>Ready to share · simulated</span>
-        </div>
-      </div>
-    )}
-    <button type="button" className={styles.secondary} onClick={onTracking}>
-      View tracking <Clock3 size={18} />
-    </button>
-    <button
-      type="button"
-      className={styles.primary}
-      onClick={onRecheck}
-      disabled={busy}
-    >
-      {busy ? "Checking…" : "Check again"} <RefreshCw size={18} />
-    </button>
-    <p className={styles.trust}>
-      The re-check only checks the supported issue. It does not predict claim
-      approval.
-    </p>
-  </section>
-);
+
 const SimulationView = ({
   diagnosis,
   simulation,
@@ -729,132 +523,289 @@ const SimulationView = ({
   onContinue: () => void;
   onBack: () => void;
 }) => (
-  <section>
-    <div className={styles.sectionHeading}>
-      <p className={styles.eyebrow}>Try before you touch</p>
-      <h1>See what this correction would change.</h1>
-      <p>
-        We check only the supported blocker. This is not a claim approval check.
-      </p>
-    </div>
-    {simulation ? (
-      <div className={styles.preview}>
-        <span className={styles.previewLabel}>SIMULATED RESULT</span>
-        <p>
-          <strong>Before:</strong> {simulation.blockerDelta.before} supported
-          blocker
+  <div className={s.body}>
+    <p className={s.eyebrow}>Try before you touch</p>
+    <h1 className={s.h1}>
+      {diagnosis.verdict === "FIGHT"
+        ? "See what would happen if you changed it."
+        : "See what this correction would change."}
+    </h1>
+    <p className={s.sub}>
+      This is a simulation only. No record will be changed here.
+    </p>
+    {!simulation ? (
+      <Card title="Preview a change">
+        <p className={s.sub}>
+          Right now you have <strong>1 blocker</strong>. Preview the proposed
+          change before you decide.
         </p>
-        <p>
-          <strong>After:</strong> {simulation.blockerDelta.after} supported
-          blocker
-        </p>
-        <p>
-          <strong>Change:</strong> {simulation.blockerDelta.change}
-        </p>
-        <p>{simulation.safetyResult}</p>
-        <p className={styles.trust}>{simulation.disclaimer}</p>
-      </div>
+        <Cta
+          label={
+            diagnosis.verdict === "FIGHT"
+              ? "Preview this change"
+              : "Run safe simulation"
+          }
+          onClick={onSimulate}
+          disabled={busy}
+        />
+      </Card>
     ) : (
-      <div className={styles.preview}>
-        <span className={styles.previewLabel}>PROPOSED CHANGE</span>
-        <p>
-          <strong>Field:</strong>{" "}
-          {diagnosis.blocker?.field ?? "the failing detail"}
-        </p>
-        <p>We will test the corrected value without changing any record.</p>
+      <>
+        <SimCompare
+          before={[
+            simulation.blockerDelta.before,
+            diagnosis.verdict === "FIGHT" ? "mismatch now" : "blocker now",
+          ]}
+          after={[
+            simulation.blockerDelta.after,
+            diagnosis.verdict === "FIGHT"
+              ? "mismatches if you change it"
+              : "blockers after correction",
+          ]}
+          tone={diagnosis.verdict === "FIGHT" ? "bad" : "good"}
+          note="No record will be changed"
+        />
+        <Alert
+          tone={diagnosis.verdict === "FIGHT" ? "danger" : "good"}
+          title={
+            diagnosis.verdict === "FIGHT"
+              ? "This change creates more mismatches."
+              : "This correction clears the blocker we found."
+          }
+        >
+          {simulation.safetyResult} {simulation.recommendation}
+        </Alert>
+        <Cta
+          label={
+            diagnosis.verdict === "FIGHT"
+              ? "Keep my current details"
+              : "Continue to the correction route"
+          }
+          onClick={onContinue}
+        />
+      </>
+    )}
+    {message && (
+      <Alert tone="warn" title="We couldn’t complete that check.">
+        {message}
+      </Alert>
+    )}
+    <LinkButton label="Go back" onClick={onBack} />
+  </div>
+);
+
+const ConsentView = ({
+  diagnosis,
+  busy,
+  message,
+  onApprove,
+  onBack,
+}: {
+  diagnosis: DiagnosisResult;
+  busy: boolean;
+  message: string;
+  onApprove: () => void;
+  onBack: () => void;
+}) => {
+  const [approved, setApproved] = useState(false);
+  return (
+    <div className={s.body}>
+      <p className={s.eyebrow}>Before you continue</p>
+      <h1 className={s.h1}>Here is exactly what we will share.</h1>
+      <p className={s.sub}>Review this simulated action before approving it.</p>
+      <Card title="Case package">
+        <div className={s.row}>
+          <span className={s.key}>Will share</span>
+          <span className={s.value}>{diagnosis.problemSummary}</span>
+        </div>
+        <div className={s.row}>
+          <span className={s.key}>Won’t happen</span>
+          <span className={s.value}>
+            No EPFO, employer, or bank record will be changed.
+          </span>
+        </div>
+      </Card>
+      <ConsentBox
+        checked={approved}
+        onChange={setApproved}
+        label="I understand this is a simulation and approve creating this case package."
+      />
+      {message && (
+        <Alert tone="warn" title="Action not saved.">
+          {message}
+        </Alert>
+      )}
+      <Cta
+        label={busy ? "Saving…" : "Approve simulated action"}
+        onClick={onApprove}
+        disabled={!approved || busy}
+      />
+      <LinkButton label="Go back" onClick={onBack} />
+    </div>
+  );
+};
+
+const ResultView = ({
+  diagnosis,
+  artifact,
+  outcome,
+  busy,
+  message,
+  onTracking,
+  onRecheck,
+  onShare,
+}: {
+  diagnosis: DiagnosisResult;
+  artifact?: Artifact;
+  outcome?: string;
+  busy: boolean;
+  message: string;
+  onTracking: () => void;
+  onRecheck: () => void;
+  onShare: () => void;
+}) => (
+  <div className={s.body}>
+    <p className={s.eyebrow}>
+      {outcome === "RESOLVED"
+        ? "Issue resolved"
+        : diagnosis.verdict === "FORWARD"
+          ? "Employer handoff"
+          : "Case summary"}
+    </p>
+    <h1 className={s.h1}>
+      {outcome === "RESOLVED"
+        ? "The issue we found has been resolved."
+        : artifact
+          ? "Your case summary is ready."
+          : "Your case is saved."}
+    </h1>
+    <p className={s.sub}>
+      {outcome === "RESOLVED"
+        ? "This check covered the supported issue only. It does not predict claim approval."
+        : "Nothing was submitted. This simulated package is ready to review."}
+    </p>
+    {artifact && <Receipt artifact={artifact} onShare={onShare} />}
+    {message && (
+      <Alert tone="warn" title="We couldn’t complete that action.">
+        {message}
+      </Alert>
+    )}
+    <Cta
+      label="View tracking"
+      icon={<Clock3 size={18} />}
+      onClick={onTracking}
+    />
+    <Cta
+      label={busy ? "Checking…" : "Check again"}
+      icon={<RefreshCw size={18} />}
+      onClick={onRecheck}
+      disabled={busy}
+    />
+  </div>
+);
+const Receipt = ({
+  artifact,
+  onShare,
+}: { artifact: Artifact; onShare: () => void }) => (
+  <section className={s.receipt}>
+    <div className={s.receiptHead}>
+      <strong>
+        <img src="/assets/favicon-48.png" alt="" /> Nidhi Rakshak · Case summary
+      </strong>
+      <div>
+        Case reference:{" "}
+        {String(
+          artifact.payload.caseReference ??
+            artifact.payload.caseId ??
+            "simulated",
+        )}
       </div>
-    )}
-    {message && <p className={styles.inlineError}>{message}</p>}
-    {!simulation && (
-      <button
-        type="button"
-        className={styles.primary}
-        onClick={onSimulate}
-        disabled={busy}
-      >
-        {busy ? "Checking…" : "Run safe simulation"} <ArrowRight size={18} />
+    </div>
+    <div className={s.receiptBody}>
+      {Object.entries(artifact.payload)
+        .filter(([key]) => key !== "simulated")
+        .slice(0, 9)
+        .map(([key, value]) => (
+          <div className={s.row} key={key}>
+            <span className={s.key}>{key.replaceAll(/([A-Z])/g, " $1")}</span>
+            <span className={s.value}>
+              {Array.isArray(value) ? value.join(", ") : String(value)}
+            </span>
+          </div>
+        ))}
+    </div>
+    <div className={s.footer}>
+      <span>SIMULATED PROTOTYPE</span>
+      <button className={s.secondary} onClick={onShare} type="button">
+        <Share2 size={16} /> Share
       </button>
-    )}
-    {simulation?.safety === "SAFE" && (
-      <button type="button" className={styles.primary} onClick={onContinue}>
-        Continue to consent <ArrowRight size={18} />
-      </button>
-    )}
-    {simulation?.safety === "UNSAFE" && (
-      <p className={styles.warning}>Do not make this change.</p>
-    )}
-    <button type="button" className={styles.secondary} onClick={onBack}>
-      Go back
-    </button>
+    </div>
   </section>
 );
 const TrackingView = ({
   tracking,
   message,
   onBack,
-}: {
-  tracking?: Tracking;
-  message: string;
-  onBack: () => void;
-}) => (
-  <section>
-    <div className={styles.sectionHeading}>
-      <p className={styles.eyebrow}>Case tracking</p>
-      <h1>Here is what happens next.</h1>
-      <p>This status is simulated. No external submission has occurred.</p>
+}: { tracking?: Tracking; message: string; onBack: () => void }) => {
+  const statusLabel =
+    tracking?.status === "WAITING" || tracking?.status === "IN_RESOLUTION"
+      ? "Waiting for review"
+      : tracking?.status === "RESOLVED"
+        ? "Resolved"
+        : (tracking?.status ?? "Not started");
+  return (
+    <div className={s.body}>
+      <p className={s.eyebrow}>Tracking</p>
+      <h1 className={s.h1}>We are tracking this for you.</h1>
+      {tracking ? (
+        <Card title="Current status">
+          <div className={s.row}>
+            <span className={s.key}>Status</span>
+            <span className={s.statusPill}>{statusLabel}</span>
+          </div>
+          <div className={s.row}>
+            <span className={s.key}>Owner</span>
+            <span className={s.value}>{tracking.owner}</span>
+          </div>
+          <div className={s.row}>
+            <span className={s.key}>Blocker</span>
+            <span className={s.value}>
+              {tracking.currentBlocker ?? "No blocker recorded."}
+            </span>
+          </div>
+          <div className={s.row}>
+            <span className={s.key}>Last action</span>
+            <span className={s.value}>
+              {tracking.lastAction ?? "No action recorded."}
+            </span>
+          </div>
+          <div className={s.row}>
+            <span className={s.key}>Next step</span>
+            <span className={s.value}>{tracking.nextStep}</span>
+          </div>
+        </Card>
+      ) : (
+        <Alert tone="warn" title="Tracking is unavailable.">
+          Your case has not changed. Try again later.
+        </Alert>
+      )}
+      {message && <p className={s.sub}>{message}</p>}
+      <LinkButton label="Back to case summary" onClick={onBack} />
     </div>
-    {tracking ? (
-      <div className={styles.preview}>
-        <p>
-          <strong>Owner:</strong> {tracking.owner}
-        </p>
-        <p>
-          <strong>Status:</strong> {tracking.status}
-        </p>
-        <p>
-          <strong>Next:</strong> {tracking.nextStep}
-        </p>
-        {tracking.events.map((event, index) => (
-          <p key={`${event.toStatus}-${index}`}>
-            <strong>{event.toStatus}:</strong> {event.reason}
-          </p>
-        ))}
-      </div>
-    ) : (
-      <StateCard
-        title="Tracking is unavailable"
-        body="Your case has not changed."
-      />
-    )}
-    {message && <p className={styles.inlineError}>{message}</p>}
-    <button type="button" className={styles.secondary} onClick={onBack}>
-      Go back
-    </button>
-  </section>
-);
-const InfoCard = ({
-  icon,
-  label,
-  value,
-}: { icon: ReactNode; label: string; value: string }) => (
-  <div className={styles.infoCard}>
-    {icon}
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  </div>
-);
-const StateCard = ({
-  icon,
-  title,
-  body,
-  action,
-}: { icon?: ReactNode; title: string; body: string; action?: ReactNode }) => (
-  <section className={styles.stateCard}>
-    {icon}
-    <h1>{title}</h1>
-    <p>{body}</p>
-    {action}
-  </section>
-);
+  );
+};
+
+const shareArtifact = async (artifact?: Artifact) => {
+  if (!artifact) return;
+  const text = Object.entries(artifact.payload)
+    .map(
+      ([key, value]) =>
+        `${key}: ${Array.isArray(value) ? value.join(", ") : String(value)}`,
+    )
+    .join("\n");
+  if (navigator.share) {
+    await navigator.share({ title: "Nidhi Rakshak case summary", text });
+    return;
+  }
+  await navigator.clipboard?.writeText(text);
+};

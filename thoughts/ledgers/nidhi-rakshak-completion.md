@@ -25,20 +25,20 @@ Complete the documented Claim Intelligence and Resolution Recovery prototype, in
   - [x] Complete local provider integration seam.
   - [x] Add browser golden-flow and viewport verification.
   - [x] Update blueprint checklists and implementation evidence.
-- Now: [→] Handoff local verification and external-gate blockers.
+- Now: [→] Submission-ready UI and journey verification.
 - Next:
-  - [ ] Run configured Supabase provider replay and migration verification.
-  - [ ] Verify Vercel environment parity and deploy preview.
-  - [ ] Merge/promote only after remote integrated golden-flow verification.
+  - [ ] Deploy preview when a deployment URL is requested.
 
 ## Open Questions
-- UNCONFIRMED: Remote Supabase and Vercel credentials are available for deployment verification.
+- Confirmed: Fixture-backed submission demo is the intended scope. No live database dependency is required.
+- Confirmed: `NIDHI_FIXTURE_MODE=true` exists in local, example, Vercel Preview, and Vercel Production environments.
+- UNCONFIRMED: A deployment URL is required; none was requested in this handoff.
 
 ## Working Set
 - Branch: `main`
 - Commits: `c77a4d7`, final claim-context/persistence follow-up pending commit
 - Spec: `.scratch/nidhi-rakshak-completion/spec.md`
 - Tickets: `.scratch/nidhi-rakshak-completion/issues/`
-- Test: `pnpm test`
-- Check: `pnpm check`
+- Test: `pnpm test`, `pnpm test:e2e`
+- Check: `pnpm check`, `git diff --check`
 - Build: `pnpm build`

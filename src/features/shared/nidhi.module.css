@@ -4,7 +4,7 @@
   padding-bottom: 32px;
 }
 .shell {
-  width: min(100%, 720px);
+  width: min(100%, 460px);
   margin: 0 auto;
 }
 .head {
@@ -19,6 +19,14 @@
   background: color-mix(in srgb, var(--bg-page) 90%, transparent);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-default);
+}
+.headInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(100%, 460px);
+  margin: 0 auto;
 }
 .brand {
   display: flex;
@@ -65,6 +73,13 @@
   letter-spacing: .05em;
   text-transform: uppercase;
 }
+.column {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(100%, 460px);
+  margin: 0 auto;
+}
 .context span:last-child {
   color: var(--text-secondary);
   font-weight: 500;
@@ -73,6 +88,8 @@
   text-align: right;
 }
 .body {
+  width: min(100%, 460px);
+  margin-inline: auto;
   padding: 22px 16px;
 }
 .eyebrow {
@@ -211,6 +228,9 @@
   background: var(--state-warning-bg);
   border-color: color-mix(in srgb, var(--state-warning) 45%, transparent);
 }
+.sourceMain {
+  min-width: 0;
+}
 .sourceName {
   color: var(--text-muted);
   font-size: 11px;
@@ -241,6 +261,37 @@
 .stateDiff {
   color: var(--state-warning);
 }
+.owner {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+}
+.ownerIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--state-info-bg);
+  color: var(--action-primary);
+}
+.ownerLabel {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.owner h2 {
+  margin: 2px 0 0;
+  color: var(--text-heading);
+  font-size: 17px;
+}
+.owner p {
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+}
 .row {
   display: flex;
   gap: 12px;
@@ -262,6 +313,16 @@
 .value {
   color: var(--text-heading);
   font-weight: 600;
+}
+.statusPill {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--state-warning-bg);
+  color: var(--state-warning);
+  font-size: 12px;
+  font-weight: 700;
 }
 .timeline {
   margin: 12px 0 0;
@@ -287,6 +348,97 @@
 }
 .timeline li:last-child {
   border-left-color: transparent;
+}
+.simRow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.simBox {
+  display: grid;
+  gap: 6px;
+  min-height: 88px;
+  place-items: center;
+  padding: 14px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 13px;
+  background: var(--bg-surface);
+  text-align: center;
+}
+.simBox strong {
+  color: var(--text-heading);
+  font-size: 34px;
+  line-height: 1;
+}
+.simBox span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+.simBad {
+  border-color: color-mix(in srgb, var(--state-danger) 40%, transparent);
+  background: var(--state-danger-bg);
+}
+.simBad strong {
+  color: var(--state-danger);
+}
+.simGood {
+  border-color: color-mix(in srgb, var(--state-success) 40%, transparent);
+  background: var(--state-success-bg);
+}
+.simGood strong {
+  color: var(--state-success);
+}
+.simArrow {
+  color: var(--text-muted);
+}
+.simLabel {
+  display: block;
+  margin-top: 12px;
+  color: var(--state-warning);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-top: 16px;
+  padding: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1.45;
+}
+.consent input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.checkbox {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border: 2px solid var(--border-strong);
+  border-radius: 6px;
+}
+.checkbox svg {
+  opacity: 0;
+  color: white;
+}
+.consent input:checked + .checkbox {
+  border-color: var(--action-primary);
+  background: var(--action-primary);
+}
+.consent input:checked + .checkbox svg {
+  opacity: 1;
 }
 .case {
   display: flex;
