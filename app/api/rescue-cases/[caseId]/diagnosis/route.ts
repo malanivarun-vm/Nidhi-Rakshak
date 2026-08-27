@@ -1,4 +1,5 @@
-import { getFixtureDiagnosisForApi } from "../../../../../src/features/claim-intelligence/diagnosis-api-provider";
+import type { DiagnosisResult as DiagnosisResultType } from "../../../../../src/domain/contracts";
+import { createDiagnosisApiProvider } from "../../../../../src/features/claim-intelligence/diagnosis-api-provider";
 import { createErrorResponse } from "../../../../../src/features/claim-intelligence/http";
 import {
   isRouteResponse,
@@ -12,7 +13,8 @@ export async function GET(
   const caseId = await requireCaseId(context);
   if (isRouteResponse(caseId)) return caseId;
 
-  if (process.env.NIDHI_FIXTURE_MODE !== "true")
+  const provider = createDiagnosisApiProvider();
+  if (provider === null)
     return createErrorResponse({
       code: "DIAGNOSIS_PROVIDER_UNAVAILABLE",
       message: "Diagnosis is temporarily unavailable. Please try again.",
@@ -20,7 +22,17 @@ export async function GET(
       status: 503,
     });
 
-  const diagnosis = await getFixtureDiagnosisForApi({ caseId });
+  let diagnosis: DiagnosisResultType | null;
+  try {
+    diagnosis = await provider.getByCaseId(caseId);
+  } catch {
+    return createErrorResponse({
+      code: "DIAGNOSIS_PROVIDER_UNAVAILABLE",
+      message: "Diagnosis is temporarily unavailable. Please try again.",
+      retryable: true,
+      status: 503,
+    });
+  }
   if (diagnosis === null)
     return createErrorResponse({
       code: "DIAGNOSIS_NOT_FOUND",

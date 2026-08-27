@@ -36,3 +36,14 @@ export function createFixtureDiagnosisProvider(): DiagnosisProvider {
     },
   };
 }
+
+export function createDatabaseDiagnosisProvider(
+  repository: DiagnosisRepository,
+): DiagnosisProvider {
+  return {
+    async getByCaseId(caseId) {
+      const diagnosis = await repository.getLatestByCaseId(caseId);
+      return diagnosis === null ? null : DiagnosisResult.parse(diagnosis);
+    },
+  };
+}

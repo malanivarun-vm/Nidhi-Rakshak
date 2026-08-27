@@ -4,8 +4,10 @@ import {
 } from "../../domain/contracts";
 import {
   type DiagnosisProvider,
+  createDatabaseDiagnosisProvider,
   createFixtureDiagnosisProvider,
 } from "./diagnosis-provider";
+import { createDatabaseDiagnosisRepository } from "./drizzle-diagnosis-repository";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -19,15 +21,15 @@ export type DiagnosisApiProvider = Pick<DiagnosisProvider, "getByCaseId">;
 export function createDiagnosisApiProvider(
   environment: Environment = process.env,
 ): DiagnosisApiProvider | null {
-  if (environment.NIDHI_FIXTURE_MODE !== "true") return null;
+  if (environment.NIDHI_FIXTURE_MODE === "true")
+    return createFixtureDiagnosisProvider();
 
-  const fixtureProvider = createFixtureDiagnosisProvider();
-  return {
-    async getByCaseId(caseId) {
-      const diagnosis = await fixtureProvider.getByCaseId(caseId);
-      return diagnosis === null ? null : DiagnosisResult.parse(diagnosis);
-    },
-  };
+  const databaseUrl = environment.DATABASE_URL;
+  if (databaseUrl === undefined || databaseUrl.trim() === "") return null;
+
+  return createDatabaseDiagnosisProvider(
+    createDatabaseDiagnosisRepository(databaseUrl),
+  );
 }
 
 export async function getFixtureDiagnosisForApi(input: {
