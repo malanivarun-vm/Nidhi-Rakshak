@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { DiagnosisResult as DiagnosisResultSchema } from "../../../../../src/domain/contracts";
+import { databasePersistence } from "../../../../../src/features/resolution-recovery/persistence";
 import { getResolutionDiagnosis } from "../../../../../src/features/resolution-recovery/provider";
 import {
   SimulationInputSchema,
@@ -73,13 +74,15 @@ export const POST = async (
     );
   }
 
+  const simulation = simulationService.simulate(
+    validatedDiagnosis,
+    parsedBody.data,
+    `${caseId}:${idempotencyKey}`,
+  );
+  await databasePersistence.saveSimulation(validatedDiagnosis, simulation);
   return NextResponse.json({
     data: {
-      simulation: simulationService.simulate(
-        validatedDiagnosis,
-        parsedBody.data,
-        `${caseId}:${idempotencyKey}`,
-      ),
+      simulation,
     },
   });
 };

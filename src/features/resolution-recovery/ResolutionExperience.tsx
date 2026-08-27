@@ -17,7 +17,7 @@ import type { ReactNode } from "react";
 import type { DiagnosisResult } from "../../domain/contracts";
 import styles from "./ResolutionExperience.module.css";
 
-type View = "summary" | "consent" | "result";
+type View = "summary" | "simulation" | "consent" | "result" | "tracking";
 interface ApiState {
   diagnosis?: DiagnosisResult;
   error?: string;
@@ -26,6 +26,21 @@ interface ApiState {
 interface Artifact {
   kind: string;
   payload: Record<string, unknown>;
+}
+interface Simulation {
+  safety: "SAFE" | "UNSAFE" | "NOT_AVAILABLE";
+  safetyResult: string;
+  recommendation: string;
+  blockerDelta: { before: number; after: number; change: number };
+  proposedChange: { field: string; before: string; after: string };
+  disclaimer: string;
+}
+interface Tracking {
+  status: string;
+  owner: string;
+  nextStep: string;
+  events: Array<{ toStatus: string; reason: string; createdAt: string }>;
+  simulated: boolean;
 }
 
 const ownerLabel = (owner: DiagnosisResult["owner"]) =>
@@ -47,16 +62,18 @@ const headline = (diagnosis: DiagnosisResult) =>
           ? "One detail needs to be corrected."
           : "You don’t need to do anything right now.";
 const actionLabel = (diagnosis: DiagnosisResult) =>
-  diagnosis.verdict === "FIGHT"
-    ? "Resolve this with EPFO"
-    : diagnosis.verdict === "FORWARD"
-      ? "Send this to my employer"
-      : diagnosis.verdict === "FIX"
-        ? "See the safe correction"
-        : "Get help through EPFO";
+  diagnosis.status === "UNSUPPORTED" || diagnosis.verdict === undefined
+    ? "Get help through EPFO"
+    : diagnosis.verdict === "FIGHT"
+      ? "Resolve this with EPFO"
+      : diagnosis.verdict === "FORWARD"
+        ? "Send this to my employer"
+        : diagnosis.verdict === "FIX"
+          ? "See the safe correction"
+          : "Check again later";
 
 const loadDiagnosis = async (caseId: string) => {
-  const response = await fetch(`/api/resolution/${caseId}`);
+  const response = await fetch(`/api/rescue-cases/${caseId}/resolution`);
   if (!response.ok) throw new Error("We couldn’t load the claim details.");
   const body = (await response.json()) as {
     data?: { diagnosis?: DiagnosisResult };
@@ -70,6 +87,9 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [artifact, setArtifact] = useState<Artifact>();
+  const [simulation, setSimulation] = useState<Simulation>();
+  const [recheckOutcome, setRecheckOutcome] = useState<string>();
+  const [tracking, setTracking] = useState<Tracking>();
 
   const load = useCallback(() => {
     setState({ loading: true });
@@ -82,6 +102,22 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    if (state.loading || state.error || !state.diagnosis) return;
+    fetch(`/api/rescue-cases/${caseId}/tracking`)
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = (await response.json()) as {
+          data?: { tracking?: Tracking };
+        };
+        const current = body.data?.tracking;
+        if (current?.events.length) {
+          setTracking(current);
+          setView("result");
+        }
+      })
+      .catch(() => undefined);
+  }, [caseId, state.diagnosis, state.error, state.loading]);
 
   if (state.loading)
     return (
@@ -130,7 +166,7 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
           : diagnosis.verdict === "NONE"
             ? "WAIT"
             : "EPFO_REVIEW";
-      const response = await fetch(`/api/resolution/${caseId}/actions`, {
+      const response = await fetch(`/api/rescue-cases/${caseId}/actions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": key },
         body: JSON.stringify({
@@ -149,7 +185,7 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
         throw new Error("We couldn’t save this action. Try again.");
       if (diagnosis.verdict === "FORWARD" || diagnosis.verdict === "FIGHT") {
         const handoffResponse = await fetch(
-          `/api/resolution/${caseId}/handoffs`,
+          `/api/rescue-cases/${caseId}/handoffs`,
           {
             method: "POST",
             headers: {
@@ -175,7 +211,75 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
         };
         setArtifact(handoffBody.data.artifact);
       }
+      if (diagnosis.verdict !== "FORWARD") {
+        const receiptResponse = await fetch(
+          `/api/rescue-cases/${caseId}/receipts`,
+          {
+            method: "POST",
+            headers: { "Idempotency-Key": key },
+          },
+        );
+        if (!receiptResponse.ok)
+          throw new Error("The case summary could not be prepared. Try again.");
+        const receiptBody = (await receiptResponse.json()) as {
+          data: { receipt: Artifact };
+        };
+        setArtifact(receiptBody.data.receipt);
+      }
       setView("result");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runSimulation = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const field = diagnosis.blocker?.field ?? "supported_detail";
+      const response = await fetch(`/api/rescue-cases/${caseId}/simulations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          proposedChange: {
+            field,
+            before: "Current value",
+            after: "Corrected value",
+          },
+          before: { supportedBlockerCount: 1 },
+          after: { supportedBlockerCount: 0 },
+        }),
+      });
+      const body = (await response.json()) as {
+        data?: { simulation?: Simulation };
+      };
+      if (!response.ok || !body.data?.simulation)
+        throw new Error("We couldn’t simulate this change safely. Try again.");
+      setSimulation(body.data.simulation);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loadTracking = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/rescue-cases/${caseId}/tracking`);
+      const body = (await response.json()) as {
+        data?: { tracking?: Tracking };
+      };
+      if (!response.ok || !body.data?.tracking)
+        throw new Error("Tracking is unavailable. Try again.");
+      setTracking(body.data.tracking);
+      setView("tracking");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Try again.");
     } finally {
@@ -205,23 +309,48 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
         <Result
           diagnosis={diagnosis}
           artifact={artifact}
+          outcome={recheckOutcome}
+          onTracking={loadTracking}
           onRecheck={async () => {
             setBusy(true);
-            const response = await fetch(`/api/resolution/${caseId}/recheck`, {
-              method: "POST",
-              headers: { "Idempotency-Key": crypto.randomUUID() },
-            });
-            const body = (await response.json()) as {
-              data?: { result?: { outcome: string } };
-            };
-            setMessage(
-              body.data?.result?.outcome === "RESOLVED"
-                ? "The issue we found has been resolved."
-                : "This issue is still showing. Check the new details before changing anything.",
-            );
-            setBusy(false);
+            setMessage("");
+            try {
+              const response = await fetch(
+                `/api/rescue-cases/${caseId}/recheck`,
+                {
+                  method: "POST",
+                  headers: { "Idempotency-Key": crypto.randomUUID() },
+                },
+              );
+              const body = (await response.json()) as {
+                data?: { result?: { outcome: string } };
+              };
+              if (!response.ok || !body.data?.result)
+                throw new Error("We couldn’t check this case. Try again.");
+              setRecheckOutcome(body.data.result.outcome);
+            } catch (error) {
+              setMessage(error instanceof Error ? error.message : "Try again.");
+            } finally {
+              setBusy(false);
+            }
           }}
           busy={busy}
+        />
+      ) : view === "tracking" ? (
+        <TrackingView
+          tracking={tracking}
+          message={message}
+          onBack={() => setView("result")}
+        />
+      ) : view === "simulation" ? (
+        <SimulationView
+          diagnosis={diagnosis}
+          simulation={simulation}
+          busy={busy}
+          message={message}
+          onSimulate={runSimulation}
+          onContinue={() => simulation?.safety === "SAFE" && setView("consent")}
+          onBack={() => setView("summary")}
         />
       ) : view === "consent" ? (
         <Consent
@@ -240,7 +369,9 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
               ? setMessage(
                   "This rejection is not supported yet. Get help through EPFO.",
                 )
-              : setView("consent")
+              : diagnosis.verdict === "FIX"
+                ? setView("simulation")
+                : setView("consent")
           }
           message={message}
         />
@@ -411,31 +542,53 @@ const Consent = ({
 const Result = ({
   diagnosis,
   artifact,
+  outcome,
+  onTracking,
   onRecheck,
   busy,
 }: {
   diagnosis: DiagnosisResult;
   artifact?: Artifact;
+  outcome?: string;
+  onTracking: () => void;
   onRecheck: () => void;
   busy: boolean;
 }) => (
   <section>
     <div className={styles.answer}>
       <div className={styles.answerIcon}>
-        <Check />
+        {outcome === "RESOLVED" ? <Check /> : <ShieldCheck />}
       </div>
       <p className={styles.eyebrow}>
-        {diagnosis.verdict === "FORWARD" ? "Package ready" : "Case saved"}
+        {outcome === "RESOLVED"
+          ? "Issue resolved"
+          : outcome === "SAME_BLOCKER"
+            ? "Same issue found"
+            : outcome === "NEW_BLOCKER"
+              ? "New issue found"
+              : diagnosis.verdict === "FORWARD"
+                ? "Package ready"
+                : "Case saved"}
       </p>
       <h1>
-        {diagnosis.verdict === "FORWARD"
-          ? "Your employer package is ready."
-          : "Your case summary is ready."}
+        {outcome === "RESOLVED"
+          ? "The issue we found has been resolved."
+          : outcome === "SAME_BLOCKER"
+            ? "This issue is still showing."
+            : outcome === "NEW_BLOCKER"
+              ? "A different issue needs attention."
+              : diagnosis.verdict === "FORWARD"
+                ? "Your employer package is ready."
+                : "Your case summary is ready."}
       </h1>
       <p>
-        {diagnosis.verdict === "FORWARD"
-          ? "Share this with your previous employer. This prototype has not sent it."
-          : "You can use this summary when you contact EPFO. Nothing was submitted."}
+        {outcome === "RESOLVED"
+          ? "This check only covered the supported issue. It does not predict claim approval."
+          : outcome
+            ? "Review the new details before changing anything. No external record was changed."
+            : diagnosis.verdict === "FORWARD"
+              ? "Share this with your previous employer. This prototype has not sent it."
+              : "You can use this summary when you contact EPFO. Nothing was submitted."}
       </p>
     </div>
     {artifact && (
@@ -451,6 +604,9 @@ const Result = ({
         </div>
       </div>
     )}
+    <button type="button" className={styles.secondary} onClick={onTracking}>
+      View tracking <Clock3 size={18} />
+    </button>
     <button
       type="button"
       className={styles.primary}
@@ -463,6 +619,126 @@ const Result = ({
       The re-check only checks the supported issue. It does not predict claim
       approval.
     </p>
+  </section>
+);
+const SimulationView = ({
+  diagnosis,
+  simulation,
+  busy,
+  message,
+  onSimulate,
+  onContinue,
+  onBack,
+}: {
+  diagnosis: DiagnosisResult;
+  simulation?: Simulation;
+  busy: boolean;
+  message: string;
+  onSimulate: () => void;
+  onContinue: () => void;
+  onBack: () => void;
+}) => (
+  <section>
+    <div className={styles.sectionHeading}>
+      <p className={styles.eyebrow}>Try before you touch</p>
+      <h1>See what this correction would change.</h1>
+      <p>
+        We check only the supported blocker. This is not a claim approval check.
+      </p>
+    </div>
+    {simulation ? (
+      <div className={styles.preview}>
+        <span className={styles.previewLabel}>SIMULATED RESULT</span>
+        <p>
+          <strong>Before:</strong> {simulation.blockerDelta.before} supported
+          blocker
+        </p>
+        <p>
+          <strong>After:</strong> {simulation.blockerDelta.after} supported
+          blocker
+        </p>
+        <p>
+          <strong>Change:</strong> {simulation.blockerDelta.change}
+        </p>
+        <p>{simulation.safetyResult}</p>
+        <p className={styles.trust}>{simulation.disclaimer}</p>
+      </div>
+    ) : (
+      <div className={styles.preview}>
+        <span className={styles.previewLabel}>PROPOSED CHANGE</span>
+        <p>
+          <strong>Field:</strong>{" "}
+          {diagnosis.blocker?.field ?? "the failing detail"}
+        </p>
+        <p>We will test the corrected value without changing any record.</p>
+      </div>
+    )}
+    {message && <p className={styles.inlineError}>{message}</p>}
+    {!simulation && (
+      <button
+        type="button"
+        className={styles.primary}
+        onClick={onSimulate}
+        disabled={busy}
+      >
+        {busy ? "Checking…" : "Run safe simulation"} <ArrowRight size={18} />
+      </button>
+    )}
+    {simulation?.safety === "SAFE" && (
+      <button type="button" className={styles.primary} onClick={onContinue}>
+        Continue to consent <ArrowRight size={18} />
+      </button>
+    )}
+    {simulation?.safety === "UNSAFE" && (
+      <p className={styles.warning}>Do not make this change.</p>
+    )}
+    <button type="button" className={styles.secondary} onClick={onBack}>
+      Go back
+    </button>
+  </section>
+);
+const TrackingView = ({
+  tracking,
+  message,
+  onBack,
+}: {
+  tracking?: Tracking;
+  message: string;
+  onBack: () => void;
+}) => (
+  <section>
+    <div className={styles.sectionHeading}>
+      <p className={styles.eyebrow}>Case tracking</p>
+      <h1>Here is what happens next.</h1>
+      <p>This status is simulated. No external submission has occurred.</p>
+    </div>
+    {tracking ? (
+      <div className={styles.preview}>
+        <p>
+          <strong>Owner:</strong> {tracking.owner}
+        </p>
+        <p>
+          <strong>Status:</strong> {tracking.status}
+        </p>
+        <p>
+          <strong>Next:</strong> {tracking.nextStep}
+        </p>
+        {tracking.events.map((event, index) => (
+          <p key={`${event.toStatus}-${index}`}>
+            <strong>{event.toStatus}:</strong> {event.reason}
+          </p>
+        ))}
+      </div>
+    ) : (
+      <StateCard
+        title="Tracking is unavailable"
+        body="Your case has not changed."
+      />
+    )}
+    {message && <p className={styles.inlineError}>{message}</p>}
+    <button type="button" className={styles.secondary} onClick={onBack}>
+      Go back
+    </button>
   </section>
 );
 const InfoCard = ({

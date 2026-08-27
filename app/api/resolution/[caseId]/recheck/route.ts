@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { databasePersistence } from "../../../../../src/features/resolution-recovery/persistence";
 import { getResolutionDiagnosis } from "../../../../../src/features/resolution-recovery/provider";
 import { recheckCase } from "../../../../../src/features/resolution-recovery/recovery";
 
@@ -34,9 +35,9 @@ export const POST = async (
       { status: 404 },
     );
   try {
-    return NextResponse.json({
-      data: { result: await recheckCase({ diagnosis }, `${caseId}:${key}`) },
-    });
+    const result = await recheckCase({ diagnosis }, `${caseId}:${key}`);
+    await databasePersistence.saveRecheck(diagnosis, result);
+    return NextResponse.json({ data: { result } });
   } catch {
     return NextResponse.json(
       {

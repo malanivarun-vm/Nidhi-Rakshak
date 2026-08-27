@@ -146,4 +146,16 @@ describe("resolution recovery persistence", () => {
       1,
     );
   });
+
+  it("creates a new diagnosis version for a different blocker", async () => {
+    const result = await recheckCase(
+      { diagnosis: GOLDEN_FORWARD_EXIT_DATE },
+      "new-blocker",
+    );
+    expect(result.outcome).toBe("NEW_BLOCKER");
+    if (result.outcome !== "NEW_BLOCKER")
+      throw new Error("expected new blocker");
+    expect(result.diagnosis.version).toBe(GOLDEN_FORWARD_EXIT_DATE.version + 1);
+    expect(result.diagnosis.diagnosisId).toContain("-new");
+  });
 });

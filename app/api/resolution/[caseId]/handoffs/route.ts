@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { databasePersistence } from "../../../../../src/features/resolution-recovery/persistence";
 import { getResolutionDiagnosis } from "../../../../../src/features/resolution-recovery/provider";
 import { createHandoff } from "../../../../../src/features/resolution-recovery/recovery";
 
@@ -35,9 +36,11 @@ export const POST = async (
     );
   try {
     const body = (await request.json()) as Record<string, unknown>;
+    const artifact = createHandoff({ ...body, diagnosis }, `${caseId}:${key}`);
+    await databasePersistence.saveHandoff(diagnosis, artifact);
     return NextResponse.json({
       data: {
-        artifact: createHandoff({ ...body, diagnosis }, `${caseId}:${key}`),
+        artifact,
       },
     });
   } catch (error) {

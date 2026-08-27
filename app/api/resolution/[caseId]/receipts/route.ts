@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { databasePersistence } from "../../../../../src/features/resolution-recovery/persistence";
 import { getResolutionDiagnosis } from "../../../../../src/features/resolution-recovery/provider";
 import { createReceipt } from "../../../../../src/features/resolution-recovery/recovery";
 
@@ -33,7 +34,7 @@ export const POST = async (
       },
       { status: 404 },
     );
-  return NextResponse.json({
-    data: { receipt: createReceipt(diagnosis, `${caseId}:${key}`) },
-  });
+  const receipt = createReceipt(diagnosis, `${caseId}:${key}`);
+  await databasePersistence.saveReceipt(diagnosis, receipt);
+  return NextResponse.json({ data: { receipt } });
 };

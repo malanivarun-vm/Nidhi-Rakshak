@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { databasePersistence } from "../../../../../src/features/resolution-recovery/persistence";
 import { getResolutionDiagnosis } from "../../../../../src/features/resolution-recovery/provider";
 import { createResolutionAction } from "../../../../../src/features/resolution-recovery/recovery";
 
@@ -39,6 +40,7 @@ export const POST = async (
       { ...body, diagnosis },
       `${caseId}:${key}`,
     );
+    await databasePersistence.saveAction(diagnosis, action);
     return NextResponse.json({ data: { action } });
   } catch {
     return NextResponse.json(

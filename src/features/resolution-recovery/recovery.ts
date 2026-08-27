@@ -29,6 +29,7 @@ const RecheckInputSchema = z.object({ diagnosis: z.unknown() });
 
 export interface StoredAction {
   id: string;
+  idempotencyKey: string;
   caseId: string;
   diagnosisId: string;
   actionType: ActionInput["actionType"];
@@ -40,6 +41,7 @@ export interface StoredAction {
 
 export interface StoredArtifact {
   id: string;
+  idempotencyKey?: string;
   caseId: string;
   kind: "EMPLOYER" | "EPFO" | "BANK" | "RECEIPT";
   payload: Record<string, unknown>;
@@ -133,12 +135,13 @@ export const createResolutionAction = (
 
   const action: StoredAction = {
     id: id("action"),
+    idempotencyKey,
     caseId: diagnosis.caseId,
     diagnosisId: diagnosis.diagnosisId,
     actionType: parsed.actionType,
     status: parsed.actionType === "WAIT" ? "WAITING" : "CONSENTED",
     consent: parsed.consent,
-    payload: parsed.payload,
+    payload: { ...parsed.payload, owner: diagnosis.owner },
     createdAt: now(),
   };
   store.actions.set(key, action);
@@ -166,6 +169,7 @@ export const createHandoff = (input: unknown, idempotencyKey: string) => {
   const kind = artifactKind(diagnosis.owner);
   const artifact: StoredArtifact = {
     id: id("artifact"),
+    idempotencyKey,
     caseId: diagnosis.caseId,
     kind,
     payload: {
@@ -200,6 +204,7 @@ export const createReceipt = (
     .find((item) => item.caseId === diagnosis.caseId);
   const artifact: StoredArtifact = {
     id: id("receipt"),
+    idempotencyKey,
     caseId: diagnosis.caseId,
     kind: "RECEIPT",
     payload: {
