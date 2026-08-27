@@ -8,6 +8,7 @@
     "build": "next build",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.10.5",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.0.3",

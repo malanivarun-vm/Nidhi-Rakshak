@@ -2,7 +2,7 @@
 
 > **PRD is locked — this is HOW Varun builds Claim Intelligence.** This guide is reference; follow the Session Playbook linearly.
 
-**Status:** Ready for kickoff  
+**Status:** Implemented locally; remote provider verification pending
 **Mode:** greenfield  
 **Pattern source:** greenfield — no prior implementation  
 **Authoring inputs:** `docs/PRD.md` · `docs/journeys.md` · `docs/DESIGN.md` · `docs/blueprints/00-shared-integration-contract.md`  

@@ -19,13 +19,13 @@ The demo must show that the member receives one accountable next step, not a sec
 
 ## Part 2 — Final verification
 
-- [ ] Fixture mode works without Varun’s branch.
-- [ ] No B code computes owner, blocker, Mool, or verdict.
-- [ ] Simulation contains before/after, delta, safe flag, and disclaimer.
-- [ ] Actions/handoffs require consent and idempotency.
-- [ ] Receipts and tracking show synthetic/simulated status.
-- [ ] Re-check handles resolved, same blocker, and new blocker.
-- [ ] `docs/DESIGN.md` is the only frontend authority; `lucide-react` is the only icon library.
+- [x] Fixture mode works without Varun’s branch.
+- [x] No B code computes owner, blocker, Mool, or verdict.
+- [x] Simulation contains before/after, delta, safe flag, and disclaimer.
+- [x] Actions/handoffs require consent and idempotency.
+- [x] Receipts and tracking show synthetic/simulated status.
+- [x] Re-check handles resolved, same blocker, and new blocker.
+- [x] `docs/DESIGN.md` is the only frontend authority; `lucide-react` is the only icon library.
 
 ## Part 3 — Integration choreography
 

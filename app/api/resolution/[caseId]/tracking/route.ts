@@ -17,6 +17,8 @@ export const GET = async (
             events: persisted.events,
             action: persisted.action,
             handoff: persisted.handoff,
+            receipt: persisted.receipt,
+            recheck: persisted.recheck,
             status: persisted.events.at(-1)?.toStatus ?? local.status,
           }
         : local,

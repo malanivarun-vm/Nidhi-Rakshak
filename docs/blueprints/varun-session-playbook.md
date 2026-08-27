@@ -36,7 +36,7 @@ If the branch does not exist on a separate machine, replace the worktree command
 
 - [x] Shared contract, frozen schema/migration, fixtures, deterministic 500-case generator, Next scaffold, Vercel/Supabase env docs, and `lucide-react` are committed.
 - [x] `pnpm test`, `pnpm check`, `pnpm preflight`, `pnpm db:migrate`, and `pnpm build` passed on the prepared base.
-- [ ] Confirm `NIDHI_FIXTURE_MODE=true` when using fixture mode.
+- [x] Confirm `NIDHI_FIXTURE_MODE=true` when using fixture mode.
 
 ## Session map
 

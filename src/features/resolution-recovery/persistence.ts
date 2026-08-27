@@ -24,6 +24,7 @@ export interface ResolutionPersistence {
   saveSimulation: (
     diagnosis: DiagnosisResult,
     result: SimulationResult,
+    idempotencyKey?: string,
   ) => Promise<SimulationResult>;
   saveAction: (
     diagnosis: DiagnosisResult,
@@ -41,10 +42,13 @@ export interface ResolutionPersistence {
     events: StatusEvent[];
     action?: StoredAction;
     handoff?: StoredArtifact;
+    receipt?: StoredArtifact;
+    recheck?: RecheckResult;
   }>;
   saveRecheck: (
     diagnosis: DiagnosisResult,
     result: RecheckResult,
+    idempotencyKey?: string,
   ) => Promise<RecheckResult>;
 }
 
@@ -70,11 +74,24 @@ const findRefs = async (diagnosis: DiagnosisResult) => {
 };
 
 const createDatabasePersistence = (): ResolutionPersistence => ({
-  saveSimulation: async (diagnosis, result) => {
+  saveSimulation: async (diagnosis, result, requestKey) => {
     const refs = await findRefs(diagnosis);
     if (!refs) return result;
     const db = getDatabase();
     if (!db) return result;
+    const idempotencyKey =
+      requestKey ??
+      `${diagnosis.caseId}:${diagnosis.diagnosisId}:${result.proposedChange.field}:${result.proposedChange.after}`;
+    const existing = await db
+      .select({ proposed: proposedChanges, simulation: simulations })
+      .from(proposedChanges)
+      .innerJoin(
+        simulations,
+        eq(simulations.proposedChangeId, proposedChanges.id),
+      )
+      .where(eq(proposedChanges.idempotencyKey, idempotencyKey))
+      .limit(1);
+    if (existing[0]) return result;
     await db.transaction(async (tx) => {
       const proposed = await tx
         .insert(proposedChanges)
@@ -83,6 +100,7 @@ const createDatabasePersistence = (): ResolutionPersistence => ({
           diagnosisId: refs.diagnosisDbId,
           beforeState: result.before,
           afterState: result.after,
+          idempotencyKey,
         })
         .returning({ id: proposedChanges.id });
       await tx.insert(simulations).values({
@@ -144,12 +162,24 @@ const createDatabasePersistence = (): ResolutionPersistence => ({
     if (!refs) return artifact;
     const db = getDatabase();
     if (!db) return artifact;
+    const existing = await db
+      .select()
+      .from(handoffs)
+      .where(eq(handoffs.idempotencyKey, artifact.idempotencyKey ?? ""))
+      .limit(1);
+    if (existing[0])
+      return {
+        ...artifact,
+        id: existing[0].id,
+        createdAt: existing[0].createdAt.toISOString(),
+      };
     await db.transaction(async (tx) => {
       await tx.insert(handoffs).values({
         caseId: refs.caseDbId,
         owner: diagnosis.owner,
         payload: artifact.payload,
         consentedAt: new Date(),
+        idempotencyKey: artifact.idempotencyKey,
       });
       await tx.insert(caseArtifacts).values({
         caseId: refs.caseDbId,
@@ -169,11 +199,23 @@ const createDatabasePersistence = (): ResolutionPersistence => ({
     if (!refs) return artifact;
     const db = getDatabase();
     if (!db) return artifact;
+    const existing = await db
+      .select()
+      .from(caseArtifacts)
+      .where(eq(caseArtifacts.idempotencyKey, artifact.idempotencyKey ?? ""))
+      .limit(1);
+    if (existing[0])
+      return {
+        ...artifact,
+        id: existing[0].id,
+        createdAt: existing[0].createdAt.toISOString(),
+      };
     await db.transaction(async (tx) => {
       await tx.insert(caseArtifacts).values({
         caseId: refs.caseDbId,
         kind: "RECEIPT",
         payload: artifact.payload,
+        idempotencyKey: artifact.idempotencyKey,
       });
       await tx.insert(caseStatusEvents).values({
         caseId: refs.caseDbId,
@@ -215,6 +257,13 @@ const createDatabasePersistence = (): ResolutionPersistence => ({
       .where(eq(handoffs.caseId, caseDbId))
       .orderBy(desc(handoffs.createdAt))
       .limit(1);
+    const artifacts = await db
+      .select()
+      .from(caseArtifacts)
+      .where(eq(caseArtifacts.caseId, caseDbId))
+      .orderBy(desc(caseArtifacts.createdAt));
+    const receipt = artifacts.find((item) => item.kind === "RECEIPT");
+    const recheck = artifacts.find((item) => item.kind === "RECHECK");
     return {
       events: events.map((event) => ({
         id: event.id,
@@ -247,13 +296,34 @@ const createDatabasePersistence = (): ResolutionPersistence => ({
             createdAt: forwards[0].createdAt.toISOString(),
           }
         : undefined,
+      receipt: receipt
+        ? {
+            id: receipt.id,
+            caseId,
+            kind: "RECEIPT",
+            payload: receipt.payload as Record<string, unknown>,
+            createdAt: receipt.createdAt.toISOString(),
+          }
+        : undefined,
+      recheck: recheck
+        ? (recheck.payload as { result: RecheckResult }).result
+        : undefined,
     };
   },
-  saveRecheck: async (diagnosis, result) => {
+  saveRecheck: async (diagnosis, result, requestKey) => {
     const refs = await findRefs(diagnosis);
     if (!refs) return result;
     const db = getDatabase();
     if (!db) return result;
+    const idempotencyKey =
+      requestKey ?? `${diagnosis.caseId}:recheck:${diagnosis.diagnosisId}`;
+    const existing = await db
+      .select()
+      .from(caseArtifacts)
+      .where(eq(caseArtifacts.idempotencyKey, idempotencyKey))
+      .limit(1);
+    if (existing[0]) return result;
+    const payload = { result };
     await db
       .update(rescueCases)
       .set({
@@ -265,6 +335,12 @@ const createDatabasePersistence = (): ResolutionPersistence => ({
       caseId: refs.caseDbId,
       toStatus: result.outcome === "RESOLVED" ? "RESOLVED" : "IN_RESOLUTION",
       reason: `Re-check outcome: ${result.outcome}`,
+    });
+    await db.insert(caseArtifacts).values({
+      caseId: refs.caseDbId,
+      kind: "RECHECK",
+      payload,
+      idempotencyKey,
     });
     return result;
   },

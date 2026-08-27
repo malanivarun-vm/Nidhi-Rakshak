@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { type Database, createDatabase } from "../../db";
 import { diagnosisRuns } from "../../db/schema";
 import { DiagnosisResult } from "../../domain/contracts";
@@ -12,7 +12,9 @@ export function createDrizzleDiagnosisRepository(
       const [row] = await database
         .select({ result: diagnosisRuns.result })
         .from(diagnosisRuns)
-        .where(eq(diagnosisRuns.caseId, caseId))
+        .where(
+          sql`${diagnosisRuns.result}->>'caseId' = ${caseId} OR ${diagnosisRuns.caseId} = ${caseId}`,
+        )
         .orderBy(desc(diagnosisRuns.version))
         .limit(1);
 

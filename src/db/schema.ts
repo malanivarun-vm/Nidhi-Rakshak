@@ -181,6 +181,7 @@ export const proposedChanges = pgTable("proposed_changes", {
     .references(() => diagnosisRuns.id, { onDelete: "restrict" }),
   beforeState: jsonb("before_state").notNull(),
   afterState: jsonb("after_state").notNull(),
+  idempotencyKey: varchar("idempotency_key", { length: 120 }).unique(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -220,6 +221,7 @@ export const handoffs = pgTable("handoffs", {
   owner: ownerTypeEnum("owner").notNull(),
   payload: jsonb("payload").notNull(),
   consentedAt: timestamp("consented_at", { withTimezone: true }),
+  idempotencyKey: varchar("idempotency_key", { length: 120 }).unique(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -231,6 +233,7 @@ export const caseArtifacts = pgTable("case_artifacts", {
     .references(() => rescueCases.id, { onDelete: "restrict" }),
   kind: varchar("kind", { length: 24 }).notNull(),
   payload: jsonb("payload").notNull(),
+  idempotencyKey: varchar("idempotency_key", { length: 120 }).unique(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

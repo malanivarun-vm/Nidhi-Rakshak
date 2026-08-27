@@ -36,7 +36,11 @@ export const POST = async (
     );
   try {
     const result = await recheckCase({ diagnosis }, `${caseId}:${key}`);
-    await databasePersistence.saveRecheck(diagnosis, result);
+    await databasePersistence.saveRecheck(
+      diagnosis,
+      result,
+      `${caseId}:${key}`,
+    );
     return NextResponse.json({ data: { result } });
   } catch {
     return NextResponse.json(

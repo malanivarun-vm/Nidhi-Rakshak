@@ -1,3 +1,4 @@
+import { diagnoseClaimCase } from "../../../../../src/features/claim-intelligence/api";
 import { requireIdempotencyKey } from "../../../../../src/features/claim-intelligence/http";
 import {
   isRouteResponse,
@@ -15,5 +16,10 @@ export async function POST(
   const idempotencyError = requireIdempotencyKey(request);
   if (idempotencyError) return idempotencyError;
 
-  return unavailableCaseRoute("DIAGNOSIS_NOT_READY");
+  const diagnosis = await diagnoseClaimCase(
+    caseId,
+    request.headers.get("idempotency-key") as string,
+  );
+  if (!diagnosis) return unavailableCaseRoute("DIAGNOSIS_NOT_FOUND");
+  return Response.json({ data: diagnosis });
 }

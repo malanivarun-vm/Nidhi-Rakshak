@@ -1,9 +1,7 @@
-import { desc, sql } from "drizzle-orm";
-import { getDatabase } from "../../db";
-import { diagnosisRuns } from "../../db/schema";
 import type { DiagnosisResult } from "../../domain/contracts";
 import { DiagnosisResult as DiagnosisResultSchema } from "../../domain/contracts";
 import { GOLDEN_FIXTURES } from "../../domain/golden-fixtures";
+import { createDiagnosisApiProvider } from "../claim-intelligence/diagnosis-api-provider";
 
 export interface ResolutionDiagnosisProvider {
   getDiagnosis: (caseId: string) => Promise<DiagnosisResult | undefined>;
@@ -24,17 +22,12 @@ export const fixtureResolutionDiagnosisProvider: ResolutionDiagnosisProvider = {
 export const databaseResolutionDiagnosisProvider: ResolutionDiagnosisProvider =
   {
     getDiagnosis: async (caseId) => {
-      const db = getDatabase();
-      if (!db) return undefined;
-      const rows = await db
-        .select({ result: diagnosisRuns.result })
-        .from(diagnosisRuns)
-        .where(sql`${diagnosisRuns.result}->>'caseId' = ${caseId}`)
-        .orderBy(desc(diagnosisRuns.version))
-        .limit(1);
-      if (!rows[0]) return undefined;
-      const parsed = DiagnosisResultSchema.safeParse(rows[0].result);
-      return parsed.success ? parsed.data : undefined;
+      const provider = createDiagnosisApiProvider({
+        NIDHI_FIXTURE_MODE: "false",
+        DATABASE_URL: process.env.DATABASE_URL,
+      });
+      const result = provider ? await provider.getByCaseId(caseId) : null;
+      return result === null ? undefined : DiagnosisResultSchema.parse(result);
     },
   };
 

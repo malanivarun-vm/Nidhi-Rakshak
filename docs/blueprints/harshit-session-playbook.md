@@ -36,7 +36,7 @@ If the branch does not exist on a separate machine, replace the worktree command
 
 - [x] Shared contract, frozen schema/migration, four golden fixtures, fixture provider, deterministic generator, app scaffold, Vercel/Supabase docs, and `lucide-react` are committed.
 - [x] `pnpm test`, `pnpm check`, `pnpm preflight`, `pnpm db:migrate`, and `pnpm build` passed on the prepared base.
-- [ ] Confirm fixture mode before starting B1.
+- [x] Confirm fixture mode before starting B1.
 
 ## Session map
 

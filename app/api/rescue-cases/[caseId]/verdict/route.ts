@@ -1,3 +1,4 @@
+import { getClaimCase } from "../../../../../src/features/claim-intelligence/api";
 import {
   isRouteResponse,
   requireCaseId,
@@ -11,5 +12,13 @@ export async function GET(
   const caseId = await requireCaseId(context);
   if (isRouteResponse(caseId)) return caseId;
 
-  return unavailableCaseRoute("VERDICT_NOT_READY");
+  const data = await getClaimCase(caseId);
+  if (!data) return unavailableCaseRoute("VERDICT_NOT_FOUND");
+  return Response.json({
+    data: {
+      verdict: data.diagnosis.verdict,
+      owner: data.diagnosis.owner,
+      nextRouteType: data.diagnosis.nextRouteType,
+    },
+  });
 }

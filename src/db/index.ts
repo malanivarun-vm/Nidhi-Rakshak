@@ -7,7 +7,11 @@ export type Database = NodePgDatabase<typeof schema>;
 let pool: Pool | undefined;
 
 export const getDatabase = (): Database | undefined => {
-  if (!process.env.DATABASE_URL) return undefined;
+  if (
+    !process.env.DATABASE_URL ||
+    process.env.NIDHI_DISABLE_DATABASE === "true"
+  )
+    return undefined;
   pool ??= new Pool({ connectionString: process.env.DATABASE_URL });
   return drizzle(pool, { schema });
 };

@@ -79,7 +79,11 @@ export const POST = async (
     parsedBody.data,
     `${caseId}:${idempotencyKey}`,
   );
-  await databasePersistence.saveSimulation(validatedDiagnosis, simulation);
+  await databasePersistence.saveSimulation(
+    validatedDiagnosis,
+    simulation,
+    `${caseId}:${idempotencyKey}`,
+  );
   return NextResponse.json({
     data: {
       simulation,

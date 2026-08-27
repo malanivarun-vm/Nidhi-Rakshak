@@ -1,7 +1,11 @@
 import {
+  fixtureCaseIds,
+  getClaimCase,
+  stableUuid,
+} from "../../../../../src/features/claim-intelligence/api";
+import {
   claimIdSchema,
   createErrorResponse,
-  createNotImplementedResponse,
 } from "../../../../../src/features/claim-intelligence/http";
 
 export async function GET(
@@ -17,5 +21,14 @@ export async function GET(
       status: 400,
     });
 
-  return createNotImplementedResponse("RESCUE_CONTEXT_NOT_READY");
+  const caseId = fixtureCaseIds.find((id) => stableUuid(id) === claimId);
+  const data = caseId ? await getClaimCase(caseId) : null;
+  if (!data)
+    return createErrorResponse({
+      code: "RESCUE_CONTEXT_NOT_FOUND",
+      message: "Claim context was not found.",
+      retryable: false,
+      status: 404,
+    });
+  return Response.json({ data: data.context });
 }

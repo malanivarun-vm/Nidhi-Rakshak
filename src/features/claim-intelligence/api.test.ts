@@ -1,0 +1,90 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { POST as diagnose } from "../../../app/api/rescue-cases/[caseId]/diagnose/route";
+import {
+  POST as addEvidence,
+  GET as getEvidence,
+} from "../../../app/api/rescue-cases/[caseId]/evidence/route";
+import { GET as getCase } from "../../../app/api/rescue-cases/[caseId]/route";
+import { GET as getTimeline } from "../../../app/api/rescue-cases/[caseId]/timeline/route";
+import { GET as getVerdict } from "../../../app/api/rescue-cases/[caseId]/verdict/route";
+import { POST as createCase } from "../../../app/api/rescue-cases/route";
+import { resetClaimApiStore } from "./api";
+
+const caseId = "case-golden-fight-relation-name";
+const context = { params: Promise.resolve({ caseId }) };
+
+const request = (body: unknown, key = "test-key") =>
+  new Request("http://localhost/api/rescue-cases", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+    body: JSON.stringify(body),
+  });
+
+describe("Claim Intelligence API", () => {
+  beforeEach(() => {
+    process.env.NIDHI_FIXTURE_MODE = "true";
+    resetClaimApiStore();
+  });
+
+  it("creates and reads a fixture rescue case idempotently", async () => {
+    const first = await createCase(request({ caseId }, "create-case"));
+    const duplicate = await createCase(request({ caseId }, "create-case"));
+    expect(first.status).toBe(200);
+    expect((await duplicate.json()).data.case).toEqual(
+      (await first.clone().json()).data.case,
+    );
+
+    const response = await getCase(new Request("http://localhost"), context);
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.case.caseId).toBe(caseId);
+  });
+
+  it("runs diagnosis and exposes evidence, timeline, and verdict projections", async () => {
+    const response = await diagnose(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Idempotency-Key": "diagnose-key" },
+      }),
+      context,
+    );
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.verdict).toBe("FIGHT");
+
+    const evidence = await getEvidence(
+      new Request("http://localhost"),
+      context,
+    );
+    expect((await evidence.json()).data.evidence).toHaveLength(2);
+
+    const added = await addEvidence(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": "evidence-key",
+        },
+        body: JSON.stringify({
+          source: "member_document",
+          label: "Appointment letter",
+          state: "VERIFIED",
+        }),
+      }),
+      context,
+    );
+    expect(added.status).toBe(200);
+
+    const timeline = await getTimeline(
+      new Request("http://localhost"),
+      context,
+    );
+    expect((await timeline.json()).data.timeline[0].source).toBe(
+      "member_id_2019",
+    );
+
+    const verdict = await getVerdict(new Request("http://localhost"), context);
+    expect((await verdict.json()).data).toMatchObject({
+      verdict: "FIGHT",
+      owner: "EPFO",
+    });
+  });
+});

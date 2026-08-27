@@ -21,12 +21,12 @@ The demo must show that Nidhi Rakshak can identify the first observable divergen
 
 ## Part 2 — Final verification
 
-- [ ] Fight result has `doNotTouch.applies=true`, EPFO owner, FIGHT verdict, falsifier.
-- [ ] Forward result names employer ownership and date-of-exit blocker.
-- [ ] Fix result names one bank field and member correction route.
-- [ ] Unsupported has no verdict and no simulated action.
-- [ ] Mool distinguishes verified/inferred/unknown.
-- [ ] `docs/DESIGN.md` is the only frontend authority; `lucide-react` is the only icon library.
+- [x] Fight result has `doNotTouch.applies=true`, EPFO owner, FIGHT verdict, falsifier.
+- [x] Forward result names employer ownership and date-of-exit blocker.
+- [x] Fix result names one bank field and member correction route.
+- [x] Unsupported has no verdict and no simulated action.
+- [x] Mool distinguishes verified/inferred/unknown.
+- [x] `docs/DESIGN.md` is the only frontend authority; `lucide-react` is the only icon library.
 
 ## Part 3 — Integration choreography
 

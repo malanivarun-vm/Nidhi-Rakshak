@@ -41,6 +41,9 @@ interface Tracking {
   nextStep: string;
   events: Array<{ toStatus: string; reason: string; createdAt: string }>;
   simulated: boolean;
+  receipt?: Artifact;
+  handoff?: Artifact;
+  recheck?: { outcome: string };
 }
 
 const ownerLabel = (owner: DiagnosisResult["owner"]) =>
@@ -71,6 +74,15 @@ const actionLabel = (diagnosis: DiagnosisResult) =>
         : diagnosis.verdict === "FIX"
           ? "See the safe correction"
           : "Check again later";
+
+const journeyStorageKey = (caseId: string) =>
+  `nidhi-rakshak:resolution:${caseId}`;
+
+interface SavedJourney {
+  artifact?: Artifact;
+  outcome?: string;
+  tracking?: Tracking;
+}
 
 const loadDiagnosis = async (caseId: string) => {
   const response = await fetch(`/api/rescue-cases/${caseId}/resolution`);
@@ -104,6 +116,19 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
   }, [load]);
   useEffect(() => {
     if (state.loading || state.error || !state.diagnosis) return;
+    const saved = window.localStorage.getItem(journeyStorageKey(caseId));
+    if (saved) {
+      try {
+        const journey = JSON.parse(saved) as SavedJourney;
+        if (journey.artifact) setArtifact(journey.artifact);
+        if (journey.outcome) setRecheckOutcome(journey.outcome);
+        if (journey.tracking) setTracking(journey.tracking);
+        if (journey.artifact || journey.outcome || journey.tracking)
+          setView("result");
+      } catch {
+        window.localStorage.removeItem(journeyStorageKey(caseId));
+      }
+    }
     fetch(`/api/rescue-cases/${caseId}/tracking`)
       .then(async (response) => {
         if (!response.ok) return;
@@ -113,6 +138,25 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
         const current = body.data?.tracking;
         if (current?.events.length) {
           setTracking(current);
+          if (current.receipt ?? current.handoff)
+            setArtifact(current.receipt ?? current.handoff);
+          if (current.recheck?.outcome)
+            setRecheckOutcome(current.recheck.outcome);
+          const saved = window.localStorage.getItem(journeyStorageKey(caseId));
+          const savedJourney = saved ? (JSON.parse(saved) as SavedJourney) : {};
+          window.localStorage.setItem(
+            journeyStorageKey(caseId),
+            JSON.stringify({
+              ...savedJourney,
+              ...((current.receipt ?? current.handoff)
+                ? { artifact: current.receipt ?? current.handoff }
+                : {}),
+              ...(current.recheck?.outcome
+                ? { outcome: current.recheck.outcome }
+                : {}),
+              tracking: current,
+            } satisfies SavedJourney),
+          );
           setView("result");
         }
       })
@@ -159,6 +203,7 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
     setBusy(true);
     setMessage("");
     const key = crypto.randomUUID();
+    let nextArtifact: Artifact | undefined;
     try {
       const actionType =
         diagnosis.verdict === "FIX"
@@ -209,7 +254,8 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
         const handoffBody = (await handoffResponse.json()) as {
           data: { artifact: Artifact };
         };
-        setArtifact(handoffBody.data.artifact);
+        nextArtifact = handoffBody.data.artifact;
+        setArtifact(nextArtifact);
       }
       if (diagnosis.verdict !== "FORWARD") {
         const receiptResponse = await fetch(
@@ -224,8 +270,13 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
         const receiptBody = (await receiptResponse.json()) as {
           data: { receipt: Artifact };
         };
-        setArtifact(receiptBody.data.receipt);
+        nextArtifact = receiptBody.data.receipt;
+        setArtifact(nextArtifact);
       }
+      window.localStorage.setItem(
+        journeyStorageKey(caseId),
+        JSON.stringify({ artifact: nextArtifact } satisfies SavedJourney),
+      );
       setView("result");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Try again.");
@@ -279,6 +330,14 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
       if (!response.ok || !body.data?.tracking)
         throw new Error("Tracking is unavailable. Try again.");
       setTracking(body.data.tracking);
+      window.localStorage.setItem(
+        journeyStorageKey(caseId),
+        JSON.stringify({
+          artifact,
+          tracking: body.data.tracking,
+          outcome: recheckOutcome,
+        } satisfies SavedJourney),
+      );
       setView("tracking");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Try again.");
@@ -328,6 +387,17 @@ export const ResolutionExperience = ({ caseId }: { caseId: string }) => {
               if (!response.ok || !body.data?.result)
                 throw new Error("We couldn’t check this case. Try again.");
               setRecheckOutcome(body.data.result.outcome);
+              const saved = window.localStorage.getItem(
+                journeyStorageKey(caseId),
+              );
+              const journey = saved ? (JSON.parse(saved) as SavedJourney) : {};
+              window.localStorage.setItem(
+                journeyStorageKey(caseId),
+                JSON.stringify({
+                  ...journey,
+                  outcome: body.data.result.outcome,
+                } satisfies SavedJourney),
+              );
             } catch (error) {
               setMessage(error instanceof Error ? error.message : "Try again.");
             } finally {
@@ -598,7 +668,9 @@ const Result = ({
           <strong>
             {artifact.kind === "EPFO"
               ? "EPFO review package"
-              : "Employer handoff"}
+              : artifact.kind === "RECEIPT"
+                ? "Case summary"
+                : "Employer handoff"}
           </strong>
           <span>Ready to share · simulated</span>
         </div>

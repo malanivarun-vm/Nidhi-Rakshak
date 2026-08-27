@@ -1,3 +1,4 @@
+import { getClaimCase } from "../../../../../src/features/claim-intelligence/api";
 import {
   isRouteResponse,
   requireCaseId,
@@ -11,5 +12,20 @@ export async function GET(
   const caseId = await requireCaseId(context);
   if (isRouteResponse(caseId)) return caseId;
 
-  return unavailableCaseRoute("TIMELINE_NOT_READY");
+  const data = await getClaimCase(caseId);
+  if (!data) return unavailableCaseRoute("TIMELINE_NOT_FOUND");
+  const divergence = data.diagnosis.firstDivergence;
+  return Response.json({
+    data: {
+      timeline: divergence
+        ? [
+            {
+              label: divergence.label,
+              source: divergence.source,
+              detail: divergence.detail,
+            },
+          ]
+        : [],
+    },
+  });
 }

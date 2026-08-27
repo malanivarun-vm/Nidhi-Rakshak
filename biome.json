@@ -8,6 +8,7 @@
       ".next/**",
       ".vercel/**",
       "node_modules/**",
+      "test-results/**",
       "drizzle/meta/**",
       "supabase/.temp/**"
     ]
