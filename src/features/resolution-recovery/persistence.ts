@@ -324,23 +324,24 @@ const createDatabasePersistence = (): ResolutionPersistence => ({
       .limit(1);
     if (existing[0]) return result;
     const payload = { result };
-    await db
-      .update(rescueCases)
-      .set({
-        status: result.outcome === "RESOLVED" ? "RESOLVED" : "IN_RESOLUTION",
-        updatedAt: new Date(),
-      })
-      .where(eq(rescueCases.id, refs.caseDbId));
-    await db.insert(caseStatusEvents).values({
-      caseId: refs.caseDbId,
-      toStatus: result.outcome === "RESOLVED" ? "RESOLVED" : "IN_RESOLUTION",
-      reason: `Re-check outcome: ${result.outcome}`,
-    });
-    await db.insert(caseArtifacts).values({
-      caseId: refs.caseDbId,
-      kind: "RECHECK",
-      payload,
-      idempotencyKey,
+    await db.transaction(async (tx) => {
+      const status =
+        result.outcome === "RESOLVED" ? "RESOLVED" : "IN_RESOLUTION";
+      await tx
+        .update(rescueCases)
+        .set({ status, updatedAt: new Date() })
+        .where(eq(rescueCases.id, refs.caseDbId));
+      await tx.insert(caseStatusEvents).values({
+        caseId: refs.caseDbId,
+        toStatus: status,
+        reason: `Re-check outcome: ${result.outcome}`,
+      });
+      await tx.insert(caseArtifacts).values({
+        caseId: refs.caseDbId,
+        kind: "RECHECK",
+        payload,
+        idempotencyKey,
+      });
     });
     return result;
   },

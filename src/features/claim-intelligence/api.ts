@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
+import { eq } from "drizzle-orm";
 import type { z } from "zod";
+import { getDatabase } from "../../db";
+import {
+  claimRejections,
+  claims,
+  evidenceItems,
+  rescueCases,
+} from "../../db/schema";
 import {
   DiagnosisResult,
   type DiagnosisResult as DiagnosisResultType,
@@ -68,6 +76,71 @@ const ensureCase = async (caseId: string): Promise<CaseData | null> => {
 };
 
 export const getClaimCase = async (caseId: string) => ensureCase(caseId);
+
+export const getClaimContextByClaimId = async (claimId: string) => {
+  const fixtureCaseId = fixtureCaseIds.find(
+    (caseId) => stableUuid(caseId) === claimId,
+  );
+  if (fixtureCaseId) {
+    const data = await getClaimCase(fixtureCaseId);
+    return data?.context ?? null;
+  }
+
+  const database = getDatabase();
+  if (!database) return null;
+
+  const [row] = await database
+    .select({
+      caseId: rescueCases.id,
+      claimId: claims.id,
+      externalRef: claims.externalRef,
+      claimType: claims.claimType,
+      submittedAt: claims.submittedAt,
+      rejectionId: claimRejections.id,
+      rejectionCode: claimRejections.code,
+      rejectionText: claimRejections.rawText,
+    })
+    .from(rescueCases)
+    .innerJoin(claims, eq(rescueCases.claimId, claims.id))
+    .innerJoin(claimRejections, eq(rescueCases.rejectionId, claimRejections.id))
+    .where(eq(claims.id, claimId))
+    .limit(1);
+
+  if (!row) return null;
+
+  const evidence = await database
+    .select({
+      evidenceId: evidenceItems.id,
+      source: evidenceItems.source,
+      label: evidenceItems.label,
+      state: evidenceItems.state,
+    })
+    .from(evidenceItems)
+    .where(eq(evidenceItems.caseId, row.caseId));
+
+  return ClaimContextSchema.parse({
+    caseId: row.caseId,
+    claim: {
+      claimId: row.claimId,
+      externalRef: row.externalRef,
+      claimType: row.claimType,
+      submittedAt: row.submittedAt.toISOString(),
+    },
+    rejection: {
+      rejectionId: row.rejectionId,
+      code: row.rejectionCode,
+      rawText: row.rejectionText,
+    },
+    evidence: evidence.map((item) =>
+      ContextEvidence.parse({
+        evidenceId: item.evidenceId,
+        source: item.source,
+        label: item.label,
+        state: item.state,
+      }),
+    ),
+  });
+};
 
 export const createClaimCase = async (input: {
   caseId: string;

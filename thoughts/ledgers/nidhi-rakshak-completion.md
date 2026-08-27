@@ -20,19 +20,23 @@ Complete the documented Claim Intelligence and Resolution Recovery prototype, in
 - Done:
   - [x] Audit blueprints and current implementation.
   - [x] Confirm A/B provider seam and ticket breakdown.
-- Now: [→] Publish expanded spec and tickets.
+  - [x] Implement Claim Intelligence API routes and validated database context lookup.
+  - [x] Harden B persistence and reload/resume.
+  - [x] Complete local provider integration seam.
+  - [x] Add browser golden-flow and viewport verification.
+  - [x] Update blueprint checklists and implementation evidence.
+- Now: [→] Handoff local verification and external-gate blockers.
 - Next:
-  - [ ] Implement Claim Intelligence APIs.
-  - [ ] Harden B persistence and reload/resume.
-  - [ ] Complete provider integration.
-  - [ ] Add browser and accessibility verification.
-  - [ ] Run I3 checks and update blueprint evidence.
+  - [ ] Run configured Supabase provider replay and migration verification.
+  - [ ] Verify Vercel environment parity and deploy preview.
+  - [ ] Merge/promote only after remote integrated golden-flow verification.
 
 ## Open Questions
 - UNCONFIRMED: Remote Supabase and Vercel credentials are available for deployment verification.
 
 ## Working Set
 - Branch: `main`
+- Commits: `c77a4d7`, final claim-context/persistence follow-up pending commit
 - Spec: `.scratch/nidhi-rakshak-completion/spec.md`
 - Tickets: `.scratch/nidhi-rakshak-completion/issues/`
 - Test: `pnpm test`

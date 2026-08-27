@@ -1,8 +1,4 @@
-import {
-  fixtureCaseIds,
-  getClaimCase,
-  stableUuid,
-} from "../../../../../src/features/claim-intelligence/api";
+import { getClaimContextByClaimId } from "../../../../../src/features/claim-intelligence/api";
 import {
   claimIdSchema,
   createErrorResponse,
@@ -10,9 +6,9 @@ import {
 
 export async function GET(
   _request: Request,
-  context: { params: Promise<{ claimId: string }> },
+  routeContext: { params: Promise<{ claimId: string }> },
 ) {
-  const { claimId } = await context.params;
+  const { claimId } = await routeContext.params;
   if (!claimIdSchema.safeParse(claimId).success)
     return createErrorResponse({
       code: "INVALID_CLAIM_ID",
@@ -21,14 +17,13 @@ export async function GET(
       status: 400,
     });
 
-  const caseId = fixtureCaseIds.find((id) => stableUuid(id) === claimId);
-  const data = caseId ? await getClaimCase(caseId) : null;
-  if (!data)
+  const context = await getClaimContextByClaimId(claimId);
+  if (!context)
     return createErrorResponse({
       code: "RESCUE_CONTEXT_NOT_FOUND",
       message: "Claim context was not found.",
       retryable: false,
       status: 404,
     });
-  return Response.json({ data: data.context });
+  return Response.json({ data: context });
 }

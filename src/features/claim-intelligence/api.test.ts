@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { GET as getRescueContext } from "../../../app/api/claims/[claimId]/rescue-context/route";
 import { POST as diagnose } from "../../../app/api/rescue-cases/[caseId]/diagnose/route";
 import {
   POST as addEvidence,
@@ -8,7 +9,7 @@ import { GET as getCase } from "../../../app/api/rescue-cases/[caseId]/route";
 import { GET as getTimeline } from "../../../app/api/rescue-cases/[caseId]/timeline/route";
 import { GET as getVerdict } from "../../../app/api/rescue-cases/[caseId]/verdict/route";
 import { POST as createCase } from "../../../app/api/rescue-cases/route";
-import { resetClaimApiStore } from "./api";
+import { resetClaimApiStore, stableUuid } from "./api";
 
 const caseId = "case-golden-fight-relation-name";
 const context = { params: Promise.resolve({ caseId }) };
@@ -85,6 +86,18 @@ describe("Claim Intelligence API", () => {
     expect((await verdict.json()).data).toMatchObject({
       verdict: "FIGHT",
       owner: "EPFO",
+    });
+  });
+
+  it("returns validated context for a fixture claim UUID", async () => {
+    const response = await getRescueContext(new Request("http://localhost"), {
+      params: Promise.resolve({ claimId: stableUuid(caseId) }),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toMatchObject({
+      caseId,
+      claim: { claimId: stableUuid(caseId) },
     });
   });
 });
