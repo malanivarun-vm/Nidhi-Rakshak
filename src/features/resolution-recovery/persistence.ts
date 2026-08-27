@@ -111,21 +111,33 @@ const createDatabasePersistence = (): ResolutionPersistence => ({
         payload: existing[0].payload as Record<string, string>,
         createdAt: existing[0].createdAt.toISOString(),
       };
+    let storedAction = action;
     await db.transaction(async (tx) => {
-      await tx.insert(resolutionActions).values({
-        caseId: refs.caseDbId,
-        actionType: action.actionType,
-        status: action.status,
-        idempotencyKey: action.idempotencyKey,
-        payload: action.payload,
-      });
+      const inserted = await tx
+        .insert(resolutionActions)
+        .values({
+          caseId: refs.caseDbId,
+          actionType: action.actionType,
+          status: action.status,
+          idempotencyKey: action.idempotencyKey,
+          payload: action.payload,
+        })
+        .returning({
+          id: resolutionActions.id,
+          createdAt: resolutionActions.createdAt,
+        });
+      storedAction = {
+        ...action,
+        id: inserted[0].id,
+        createdAt: inserted[0].createdAt.toISOString(),
+      };
       await tx.insert(caseStatusEvents).values({
         caseId: refs.caseDbId,
         toStatus: action.status === "WAITING" ? "WAITING" : "IN_RESOLUTION",
         reason: "Consented simulated action recorded",
       });
     });
-    return action;
+    return storedAction;
   },
   saveHandoff: async (diagnosis, artifact) => {
     const refs = await findRefs(diagnosis);

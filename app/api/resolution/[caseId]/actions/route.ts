@@ -40,8 +40,11 @@ export const POST = async (
       { ...body, diagnosis },
       `${caseId}:${key}`,
     );
-    await databasePersistence.saveAction(diagnosis, action);
-    return NextResponse.json({ data: { action } });
+    const storedAction = await databasePersistence.saveAction(
+      diagnosis,
+      action,
+    );
+    return NextResponse.json({ data: { action: storedAction } });
   } catch {
     return NextResponse.json(
       {
