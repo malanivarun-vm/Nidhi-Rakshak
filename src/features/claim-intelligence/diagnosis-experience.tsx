@@ -1,427 +1,536 @@
 "use client";
 
-import {
-  AlertTriangle,
-  ArrowRight,
-  Building2,
-  CheckCircle2,
-  CircleHelp,
-  Clock3,
-  FileText,
-  Landmark,
-  RefreshCw,
-  ShieldAlert,
-  UserRound,
-} from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { ArrowRight, Camera, RefreshCw } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
   DiagnosisResult,
   type DiagnosisResult as DiagnosisResultType,
   ErrorEnvelope,
 } from "../../domain/contracts";
-import styles from "./diagnosis-experience.module.css";
-import { toDiagnosisView } from "./diagnosis-view";
+import { GOLDEN_FIXTURES } from "../../domain/golden-fixtures";
+import {
+  Alert,
+  Card,
+  Context,
+  Cta,
+  Header,
+  Ownership,
+  RecordDiff,
+  Timeline,
+} from "../shared/components";
+import s from "../shared/nidhi.module.css";
+import { selectCorrectionRoute } from "./correction-route";
 
-const defaultCaseId = "case-golden-fight-relation-name";
-const savedCaseKey = "nidhi-rakshak:last-diagnosis-case";
+type Screen = "LIST" | "ENTRY" | "LOADING" | "DATA" | "EVIDENCE" | "ERROR";
+type FamilyKey =
+  | "service"
+  | "eligibility"
+  | "consolidation"
+  | "pending"
+  | "preflight";
+const familyCases: Record<FamilyKey, { title: string; reason: string }> = {
+  service: {
+    title: "Employment dates overlap",
+    reason: "Two service records overlap by one month.",
+  },
+  eligibility: {
+    title: "Claim amount is over the limit",
+    reason:
+      "Your details are okay, but this claim amount is above the rule limit.",
+  },
+  consolidation: {
+    title: "Two PF records need linking",
+    reason: "An older member ID is not connected to your current record.",
+  },
+  pending: {
+    title: "Transfer is already in progress",
+    reason: "EPFO is processing this transfer already.",
+  },
+  preflight: {
+    title: "Check my claim before filing",
+    reason: "Run supported checks before you submit.",
+  },
+};
+const caseRows = Object.values(GOLDEN_FIXTURES).map((fixture) => ({
+  id: fixture.caseId,
+  title:
+    fixture.journeyType === "MISMATCH"
+      ? "Name differs across records"
+      : fixture.journeyType === "MISSING_DATA"
+        ? "Last working day is missing"
+        : fixture.journeyType === "VALIDATION_FAILURE"
+          ? "Bank detail needs correction"
+          : "Rejection needs more evidence",
+  reason: fixture.problemSummary,
+}));
 
-type ScreenState = "ENTRY" | "LOADING" | "DATA" | "EMPTY" | "ERROR";
-
-type DiagnosisResponse =
-  | { kind: "DATA"; diagnosis: DiagnosisResultType }
-  | { kind: "EMPTY" }
-  | { kind: "ERROR"; message: string };
-
-function ownerIcon(owner: DiagnosisResultType["owner"]) {
-  if (owner === "EMPLOYER") return <Building2 aria-hidden="true" size={22} />;
-  if (owner === "MEMBER") return <UserRound aria-hidden="true" size={22} />;
-  if (owner === "BANK") return <Landmark aria-hidden="true" size={22} />;
-  return <FileText aria-hidden="true" size={22} />;
+async function fetchDiagnosis(caseId: string) {
+  const response = await fetch(
+    `/api/rescue-cases/${encodeURIComponent(caseId)}/diagnosis`,
+    { cache: "no-store" },
+  );
+  const body: unknown = await response.json();
+  if (response.ok)
+    return DiagnosisResult.parse((body as { data: unknown }).data);
+  if (response.status === 404) return undefined;
+  const error = ErrorEnvelope.safeParse(body);
+  throw new Error(
+    error.success
+      ? error.data.error.message
+      : "We couldn’t load the claim details.",
+  );
 }
 
-function evidenceClass(
-  state: DiagnosisResultType["evidence"][number]["state"],
-) {
-  if (state === "VERIFIED") return styles.verified;
-  if (state === "INFERRED") return styles.different;
-  return styles.unknown;
+function EvidenceRequest({
+  onBack,
+  onDone,
+}: { onBack: () => void; onDone: () => void }) {
+  return (
+    <div className={s.screen}>
+      <Header onBack={onBack} />
+      <Context value="One more record needed" />
+      <div className={s.body}>
+        <p className={s.eyebrow}>Evidence request</p>
+        <h1 className={s.h1}>We need one more record to be sure.</h1>
+        <p className={s.sub}>
+          Show the rejection message or document section that names the missing
+          detail. We only use it to check this claim.
+        </p>
+        <Card title="What to capture">
+          <ol className={s.steps}>
+            <li>Keep the claim number visible.</li>
+            <li>Make the rejection text sharp and fully in frame.</li>
+            <li>Cover unrelated personal details.</li>
+          </ol>
+        </Card>
+        <div className={s.capture} aria-label="Document capture frame" />
+        <Cta
+          label="Take a photo"
+          icon={<Camera size={18} />}
+          onClick={onDone}
+        />
+        <button className={s.secondary} onClick={onDone} type="button">
+          Upload document instead
+        </button>
+      </div>
+    </div>
+  );
 }
 
-async function getDiagnosis(caseId: string): Promise<DiagnosisResponse> {
-  try {
-    const response = await fetch(
-      `/api/rescue-cases/${encodeURIComponent(caseId)}/diagnosis`,
-      { cache: "no-store" },
+function FamilyScreen({
+  kind,
+  onBack,
+}: { kind: FamilyKey; onBack: () => void }) {
+  const data = familyCases[kind];
+  const [message, setMessage] = useState("");
+  if (kind === "preflight")
+    return (
+      <div className={s.screen}>
+        <Header onBack={onBack} />
+        <Context label="Before filing" value="Claim compiler" />
+        <div className={s.body}>
+          <p className={s.eyebrow}>Pre-flight check</p>
+          <h1 className={s.h1}>{data.title}.</h1>
+          <p className={s.sub}>
+            We’ll check the supported blockers we can see. A clear result never
+            promises approval.
+          </p>
+          <Cta
+            label="Run claim check"
+            onClick={() =>
+              setMessage(
+                "This pre-flight result is simulated for the prototype.",
+              )
+            }
+          />
+          {message && (
+            <Alert tone="info" title="Check complete.">
+              {message}
+            </Alert>
+          )}
+          <Card title="What this checks">
+            <p className={s.sub}>
+              Identity records, bank details, service history and known
+              eligibility rules.
+            </p>
+          </Card>
+        </div>
+      </div>
     );
-    const body: unknown = await response.json();
-    if (response.ok)
-      return {
-        kind: "DATA",
-        diagnosis: DiagnosisResult.parse((body as { data: unknown }).data),
-      };
-    if (response.status === 404) return { kind: "EMPTY" };
-    const error = ErrorEnvelope.safeParse(body);
-    return {
-      kind: "ERROR",
-      message: error.success
-        ? error.data.error.message
-        : "We couldn’t load this claim right now.",
-    };
-  } catch {
-    return { kind: "ERROR", message: "We couldn’t load this claim right now." };
-  }
+  return (
+    <div className={s.screen}>
+      <Header onBack={onBack} />
+      <Context value="Representative journey" />
+      <div className={s.body}>
+        <p className={s.eyebrow}>
+          {kind === "eligibility"
+            ? "Rule explanation"
+            : kind === "pending"
+              ? "Current process"
+              : kind === "consolidation"
+                ? "Record map"
+                : "Service history"}
+        </p>
+        <h1 className={s.h1}>
+          {kind === "eligibility" ? "Your details are okay." : data.title}
+        </h1>
+        <p className={s.sub}>{data.reason}</p>
+        {kind === "service" && (
+          <Card title="Service timeline">
+            <Timeline
+              items={[
+                "ABC Industries · Jan 2018 → Jun 2020",
+                "XYZ Ltd · May 2020 → Present",
+                "These dates overlap by one month.",
+              ]}
+            />
+          </Card>
+        )}
+        {kind === "eligibility" && (
+          <Alert
+            tone="info"
+            title="This is a rule limit, not a record problem."
+          >
+            Try a lower claim amount that fits this purpose.
+          </Alert>
+        )}
+        {kind === "consolidation" && (
+          <Card title="Records linked to you">
+            <Timeline
+              items={[
+                "Current PF record · active",
+                "Older member ID · needs linking",
+              ]}
+            />
+          </Card>
+        )}
+        {kind === "pending" && (
+          <Alert tone="good" title="Doing nothing is the right move.">
+            EPFO is already processing this transfer. Do not submit another
+            request.
+          </Alert>
+        )}
+        <Card title="Who acts next">
+          <p className={s.sub}>
+            {kind === "pending"
+              ? "EPFO"
+              : kind === "eligibility"
+                ? "You can change the claim amount."
+                : "Your previous employer needs to review this."}
+          </p>
+        </Card>
+        {message && (
+          <Alert tone="info" title="Action recorded.">
+            {message}
+          </Alert>
+        )}
+        <Cta
+          label={
+            kind === "eligibility"
+              ? "Change claim amount"
+              : kind === "pending"
+                ? "Check transfer status"
+                : kind === "consolidation"
+                  ? "Bring my old PF record in"
+                  : "Request a correction"
+          }
+          onClick={() =>
+            setMessage(
+              "This representative action is simulated. Keep the case summary with you.",
+            )
+          }
+        />
+      </div>
+    </div>
+  );
 }
 
 export function DiagnosisExperience() {
-  const searchParams = useSearchParams();
-  const caseId = searchParams.get("case")?.trim() || defaultCaseId;
-  const [screen, setScreen] = useState<ScreenState>("ENTRY");
-  const [diagnosis, setDiagnosis] = useState<DiagnosisResultType | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadDiagnosis = useCallback(async () => {
+  const router = useRouter();
+  const params = useSearchParams();
+  const queryCase = params.get("case");
+  const [screen, setScreen] = useState<Screen>(queryCase ? "ENTRY" : "LIST");
+  const [caseId, setCaseId] = useState(queryCase ?? "");
+  const [diagnosis, setDiagnosis] = useState<DiagnosisResultType>();
+  const [error, setError] = useState("");
+  const [family, setFamily] = useState<FamilyKey>();
+  const load = useCallback(async () => {
     setScreen("LOADING");
-    setError(null);
-    const response = await getDiagnosis(caseId);
-    if (response.kind === "DATA") {
-      setDiagnosis(response.diagnosis);
-      window.localStorage.setItem(savedCaseKey, caseId);
-      setScreen("DATA");
-      return;
+    setError("");
+    try {
+      const result = await fetchDiagnosis(caseId);
+      if (!result) throw new Error("We couldn’t find this claim.");
+      setDiagnosis(result);
+      localStorage.setItem("nidhi-rakshak:last-diagnosis-case", caseId);
+      setScreen(result.status === "UNSUPPORTED" ? "EVIDENCE" : "DATA");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "We couldn’t load the claim details.",
+      );
+      setScreen("ERROR");
     }
-    if (response.kind === "EMPTY") {
-      setDiagnosis(null);
-      setScreen("EMPTY");
-      return;
-    }
-    setError(response.message);
-    setScreen("ERROR");
   }, [caseId]);
-
-  const begin = useCallback(() => {
-    window.history.pushState({ diagnosisOpen: true }, "", window.location.href);
-    void loadDiagnosis();
-  }, [loadDiagnosis]);
-
   useEffect(() => {
-    const onBack = () => {
-      setScreen("ENTRY");
-      setError(null);
-    };
-    window.addEventListener("popstate", onBack);
-    return () => window.removeEventListener("popstate", onBack);
-  }, []);
-
-  useEffect(() => {
-    if (window.localStorage.getItem(savedCaseKey) === caseId)
-      void loadDiagnosis();
-  }, [caseId, loadDiagnosis]);
-
-  const view = diagnosis === null ? null : toDiagnosisView(diagnosis);
-
-  return (
-    <main className={styles.experience}>
-      <div className={styles.shell}>
-        <header className={styles.header}>
-          <div className={styles.brand}>
-            <Landmark aria-hidden="true" size={20} /> Nidhi Rakshak
+    if (queryCase) void load();
+  }, [queryCase, load]);
+  if (family)
+    return <FamilyScreen kind={family} onBack={() => setFamily(undefined)} />;
+  if (screen === "LIST")
+    return (
+      <div className={s.screen}>
+        <Header />
+        <div className={s.shell}>
+          <div className={s.body}>
+            <p className={s.eyebrow}>Your rejected claims</p>
+            <h1 className={s.h1}>Let’s understand what happened.</h1>
+            <p className={s.sub}>
+              Pick a claim. We’ll use the details already attached to it.
+            </p>
+            {caseRows.map((row) => (
+              <button
+                className={s.case}
+                key={row.id}
+                onClick={() => {
+                  setCaseId(row.id);
+                  setScreen("ENTRY");
+                }}
+                type="button"
+              >
+                <span className={s.caseText}>
+                  <span className={s.caseTitle}>{row.title}</span>
+                  <span className={s.caseMeta}>{row.reason}</span>
+                </span>
+                <span className={s.chip}>Rejected</span>
+                <ArrowRight size={18} />
+              </button>
+            ))}
+            <Card title="More checks">
+              <button
+                className={s.secondary}
+                onClick={() => setFamily("service")}
+                type="button"
+              >
+                Service history
+              </button>
+              <button
+                className={s.secondary}
+                onClick={() => setFamily("eligibility")}
+                type="button"
+              >
+                Eligibility rules
+              </button>
+              <button
+                className={s.secondary}
+                onClick={() => setFamily("consolidation")}
+                type="button"
+              >
+                Link old PF record
+              </button>
+              <button
+                className={s.secondary}
+                onClick={() => setFamily("pending")}
+                type="button"
+              >
+                Check an existing process
+              </button>
+              <button
+                className={s.secondary}
+                onClick={() => setFamily("preflight")}
+                type="button"
+              >
+                Check my claim before filing
+              </button>
+            </Card>
           </div>
-          <p className={styles.prototype}>Simulated prototype, not EPFO</p>
-        </header>
-        <section aria-label="Claim context" className={styles.claimContext}>
-          <p className={styles.eyebrow}>Rejected PF claim</p>
-          <p className={styles.contextMeta}>
-            Claim details were supplied by EPFO. You do not need to re-enter
-            them.
-          </p>
-        </section>
-
-        {screen === "ENTRY" && (
-          <section className={styles.main} aria-labelledby="entry-title">
-            <div className={styles.hero}>
-              <p className={styles.eyebrow}>Claim rejected</p>
-              <h1 id="entry-title">
-                Understand this rejection before you change anything.
-              </h1>
-              <p className={styles.summary}>
-                We’ll check the records already attached to this claim and show
-                the safest next step.
-              </p>
-            </div>
-            <button
-              className={styles.primaryAction}
-              onClick={begin}
-              type="button"
-            >
-              Understand this rejection{" "}
-              <ArrowRight aria-hidden="true" size={18} />
-            </button>
-            <aside className={`${styles.card} ${styles.info} ${styles.full}`}>
-              <p className={styles.status}>
-                <CircleHelp aria-hidden="true" size={18} /> We only ask for
-                another document when it can change the answer.
-              </p>
-            </aside>
-          </section>
-        )}
-
-        {screen === "LOADING" && (
-          <section
-            className={styles.main}
-            aria-live="polite"
-            aria-labelledby="loading-title"
-          >
-            <div className={styles.hero}>
-              <p className={styles.eyebrow}>Checking your claim</p>
-              <h1 id="loading-title">
-                We’re reading the records that matter for this rejection.
-              </h1>
-              <p className={styles.status}>
-                <span className={styles.loader} aria-hidden="true" /> This
-                usually takes a moment.
-              </p>
-            </div>
-          </section>
-        )}
-
-        {screen === "EMPTY" && (
-          <section
-            className={`${styles.main} ${styles.empty}`}
-            aria-labelledby="empty-title"
-          >
-            <div className={styles.hero}>
-              <p className={styles.eyebrow}>Claim context unavailable</p>
-              <h1 id="empty-title">We can’t find a claim to review.</h1>
-              <p className={styles.summary}>
-                Return to the rejected claim in EPFO and open the help link
-                again. We won’t ask you to type the details here.
-              </p>
-            </div>
-            <button
-              className={styles.secondaryAction}
-              onClick={() => setScreen("ENTRY")}
-              type="button"
-            >
-              Try again
-            </button>
-          </section>
-        )}
-
-        {screen === "ERROR" && (
-          <section
-            className={`${styles.main} ${styles.empty}`}
-            aria-labelledby="error-title"
-            role="alert"
-          >
-            <div className={styles.hero}>
-              <p className={styles.eyebrow}>Couldn’t load the claim</p>
-              <h1 id="error-title">Please try again.</h1>
-              <p className={styles.summary}>{error}</p>
-            </div>
-            <button
-              className={styles.primaryAction}
-              onClick={() => void loadDiagnosis()}
-              type="button"
-            >
-              <RefreshCw aria-hidden="true" size={18} /> Retry
-            </button>
-          </section>
-        )}
-
-        {screen === "DATA" && diagnosis !== null && view !== null && (
-          <section className={styles.main} aria-labelledby="diagnosis-title">
-            <div className={styles.hero}>
-              <p className={styles.eyebrow}>
-                {view.isRefusal ? "Need more support" : "What we found"}
-              </p>
-              <h1 id="diagnosis-title">{view.heading}</h1>
-              <p className={styles.summary}>{diagnosis.problemSummary}</p>
-            </div>
-
-            {diagnosis.doNotTouch.applies && (
-              <aside
-                className={`${styles.card} ${styles.danger} ${styles.full}`}
-                aria-label="Do not change your current details"
-              >
-                <p className={styles.sectionTitle}>
-                  <ShieldAlert aria-hidden="true" size={20} /> Don’t change your
-                  current details
-                </p>
-                <h2>
-                  Your current details agree across the records we checked.
-                </h2>
-                <p>{diagnosis.doNotTouch.reason}</p>
-              </aside>
-            )}
-
-            {view.needsEvidence && (
-              <aside
-                className={`${styles.card} ${styles.warning} ${styles.full}`}
-              >
-                <p className={styles.sectionTitle}>
-                  <AlertTriangle aria-hidden="true" size={20} /> One record is
-                  still missing
-                </p>
-                <h2>We can’t safely tell you what to change yet.</h2>
-                <p>
-                  Add only the record named below. It is the one item that could
-                  change this diagnosis.
-                </p>
-              </aside>
-            )}
-
-            <a className={styles.primaryAction} href="#next-step">
-              {view.actionLabel} <ArrowRight aria-hidden="true" size={18} />
-            </a>
-
-            {!view.isRefusal && (
-              <section
-                className={styles.card}
-                aria-labelledby="owner-title"
-                id="next-step"
-              >
-                <div className={styles.owner}>
-                  {ownerIcon(diagnosis.owner)}
-                  <div>
-                    <p className={styles.sectionTitle}>Who acts next</p>
-                    <h2 id="owner-title">{view.ownerHeading}</h2>
-                    <p>{view.ownerReason}</p>
-                  </div>
-                </div>
-                {view.correctionRoute !== undefined && (
-                  <p className={styles.handoff}>{view.correctionRoute}</p>
-                )}
-              </section>
-            )}
-
-            {diagnosis.firstDivergence !== undefined && (
-              <section
-                className={`${styles.card} ${styles.full}`}
-                aria-labelledby="mool-title"
-              >
-                <p className={styles.sectionTitle}>
-                  <Clock3 aria-hidden="true" size={18} /> Record timeline
-                </p>
-                <h2 id="mool-title">We found where the mismatch starts.</h2>
-                <ol className={styles.timeline}>
-                  <li className={styles.timelineItem}>
-                    <span className={styles.timelineStrong}>
-                      {diagnosis.firstDivergence.label}
-                    </span>
-                    {diagnosis.firstDivergence.detail}
-                  </li>
-                  <li className={styles.timelineItem}>
-                    We cannot see who entered this value from the records
-                    available here.
-                  </li>
-                </ol>
-              </section>
-            )}
-
-            {diagnosis.owner === "EMPLOYER" && (
-              <section
-                className={`${styles.card} ${styles.full}`}
-                aria-labelledby="timeline-title"
-              >
-                <p className={styles.sectionTitle}>
-                  <Clock3 aria-hidden="true" size={18} /> Service record
-                </p>
-                <h2 id="timeline-title">Your exit detail is still missing.</h2>
-                <p>
-                  The service record we checked does not have the last working
-                  day EPFO needs. We do not have enough verified detail here to
-                  show dates or make a claim about when it was entered.
-                </p>
-              </section>
-            )}
-
-            <details className={`${styles.details} ${styles.full}`}>
-              <summary>See the records we used</summary>
-              <div className={styles.detailsBody}>
-                {diagnosis.evidence.length === 0 ? (
-                  <p className={styles.falsifier}>
-                    No supporting record is available for this rejection yet.
-                  </p>
-                ) : (
-                  diagnosis.evidence.map((evidence) => (
-                    <div className={styles.source} key={evidence.evidenceId}>
-                      {evidence.state === "VERIFIED" ? (
-                        <CheckCircle2
-                          className={evidenceClass(evidence.state)}
-                          aria-hidden="true"
-                          size={18}
-                        />
-                      ) : (
-                        <AlertTriangle
-                          className={evidenceClass(evidence.state)}
-                          aria-hidden="true"
-                          size={18}
-                        />
-                      )}
-                      <span>
-                        <strong>{evidence.label}</strong>
-                        <span className={styles.sourceMeta}>
-                          {evidence.state === "VERIFIED"
-                            ? "This appears directly in the source record."
-                            : evidence.state === "INFERRED"
-                              ? "This is suggested by the available record."
-                              : "We could not verify this record."}
-                        </span>
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </details>
-
-            {diagnosis.falsifier !== undefined && (
-              <section
-                className={`${styles.card} ${styles.full}`}
-                aria-labelledby="check-title"
-              >
-                <p className={styles.sectionTitle}>
-                  <CircleHelp aria-hidden="true" size={18} /> Check this
-                  yourself
-                </p>
-                <h2 id="check-title">Want to double-check this?</h2>
-                <p className={styles.falsifier}>
-                  <strong>This would change our answer:</strong>{" "}
-                  {diagnosis.falsifier}
-                </p>
-              </section>
-            )}
-
-            {view.isRefusal && (
-              <section
-                className={`${styles.card} ${styles.info} ${styles.full}`}
-                id="next-step"
-                aria-labelledby="fallback-title"
-              >
-                <p className={styles.sectionTitle}>
-                  <FileText aria-hidden="true" size={18} /> Safe next step
-                </p>
-                <h2 id="fallback-title">
-                  Get help through the EPFO grievance route.
-                </h2>
-                <p>
-                  We have not guessed what is wrong or asked you to make a
-                  change. Keep this claim context with you when you ask for
-                  help.
-                </p>
-              </section>
-            )}
-
-            <button
-              className={styles.back}
-              onClick={() => window.history.back()}
-              type="button"
-            >
-              ← Back to claim summary
-            </button>
-          </section>
-        )}
+        </div>
       </div>
-    </main>
+    );
+  if (screen === "ENTRY")
+    return (
+      <div className={s.screen}>
+        <Header onBack={() => setScreen("LIST")} />
+        <Context value="Claim details supplied by EPFO" />
+        <div className={s.body}>
+          <p className={s.eyebrow}>Claim rejected</p>
+          <h1 className={s.h1}>
+            Understand this rejection before you change anything.
+          </h1>
+          <p className={s.sub}>
+            We’ll check the records already attached to this claim and show the
+            safest next step.
+          </p>
+          <Cta label="Understand this rejection" onClick={() => void load()} />
+          <Alert tone="info" title="You do not need to re-enter claim details.">
+            We only ask for another document when it can change the answer.
+          </Alert>
+        </div>
+      </div>
+    );
+  if (screen === "LOADING")
+    return (
+      <div className={s.screen}>
+        <Header />
+        <div className={s.body}>
+          <p className={s.eyebrow}>Checking your claim</p>
+          <h1 className={s.h1}>
+            Comparing the records relevant to this rejection…
+          </h1>
+          <p className={s.sub}>This usually takes a moment.</p>
+        </div>
+      </div>
+    );
+  if (screen === "ERROR")
+    return (
+      <div className={s.screen}>
+        <Header onBack={() => setScreen("LIST")} />
+        <div className={s.body}>
+          <p className={s.eyebrow}>We couldn’t load the claim</p>
+          <h1 className={s.h1}>Your case has not changed.</h1>
+          <p className={s.sub}>{error}</p>
+          <Cta
+            label="Try again"
+            icon={<RefreshCw size={18} />}
+            onClick={() => void load()}
+          />
+        </div>
+      </div>
+    );
+  if (screen === "EVIDENCE" || !diagnosis)
+    return (
+      <EvidenceRequest
+        onBack={() => setScreen("LIST")}
+        onDone={() => setScreen("LIST")}
+      />
+    );
+  const refusal = diagnosis.status === "UNSUPPORTED";
+  const correctionRoute = selectCorrectionRoute({
+    aadhaarValidated: diagnosis.verdict === "FIX" ? true : undefined,
+    uanIssuedBefore2017: diagnosis.verdict === "FIX" ? false : undefined,
+    fieldLevel: diagnosis.verdict === "FIX" ? "UAN_PROFILE" : undefined,
+    priorEstablishmentStatus: undefined,
+  });
+  return (
+    <div className={s.screen}>
+      <Header onBack={() => setScreen("LIST")} />
+      <Context value={`Case ${diagnosis.caseId.replace("case-golden-", "")}`} />
+      <div className={s.body}>
+        <p className={s.eyebrow}>What we found</p>
+        <h1 className={s.h1}>
+          {diagnosis.doNotTouch.applies
+            ? "Your current name is correct. Don’t change it."
+            : diagnosis.owner === "EMPLOYER"
+              ? "Your previous employer needs to fix this."
+              : "One bank detail needs to be corrected."}
+        </h1>
+        <p className={s.sub}>{diagnosis.problemSummary}</p>
+        {diagnosis.caseId.includes("fight") && (
+          <Card title="The records do not all agree">
+            <RecordDiff diagnosis={diagnosis} />
+          </Card>
+        )}
+        {diagnosis.doNotTouch.applies && (
+          <Alert tone="danger" title="Don’t change your current details.">
+            {diagnosis.doNotTouch.reason}
+          </Alert>
+        )}
+        {diagnosis.firstDivergence && (
+          <Card title="Where the mismatch starts">
+            <p className={s.sub}>
+              The first different value appears in{" "}
+              {diagnosis.firstDivergence.label}. We cannot see who entered it
+              from these records.
+            </p>
+            <Timeline
+              items={[
+                "Current identity records · RAMESH BADIGER",
+                "2019 PF record · RAJESH BADIGER",
+              ]}
+            />
+          </Card>
+        )}
+        {diagnosis.owner === "EMPLOYER" && (
+          <Card title="Service timeline">
+            <Timeline
+              items={[
+                "Previous employer · last contribution recorded",
+                "Last working day · missing",
+              ]}
+            />
+          </Card>
+        )}
+        {refusal ? (
+          <>
+            <Alert tone="info" title="We won’t guess.">
+              The information available is not enough to tell you what should be
+              changed.
+            </Alert>
+            <Cta
+              label="Get help through EPFO"
+              onClick={() => setScreen("LIST")}
+            />
+          </>
+        ) : (
+          <>
+            <Cta
+              label={
+                diagnosis.verdict === "FIGHT"
+                  ? "Resolve this with EPFO"
+                  : diagnosis.verdict === "FORWARD"
+                    ? "Send this to my employer"
+                    : "Review the safe correction"
+              }
+              onClick={() => router.push(`/resolution/${diagnosis.caseId}`)}
+            />
+            <Ownership diagnosis={diagnosis} />
+            {diagnosis.verdict === "FIX" && (
+              <Card title="Your correction route">
+                <h2>{correctionRoute.headline}</h2>
+                <p className={s.sub}>
+                  {correctionRoute.reason} Update this bank detail under Manage
+                  → KYC, then let the bank and NPCI validate it. No employer
+                  approval or passbook upload is needed.
+                </p>
+                <details className={s.disclosure}>
+                  <summary>Why this route?</summary>
+                  {correctionRoute.notApplicable.map((item) => (
+                    <p className={s.sub} key={item.label}>
+                      {item.label}: {item.why}
+                    </p>
+                  ))}
+                </details>
+              </Card>
+            )}
+            {diagnosis.verdict === "FORWARD" && (
+              <Card title="Why your employer acts next">
+                <p className={s.sub}>
+                  Your previous employer owns the missing service detail. The
+                  current employer cannot edit another establishment’s record.
+                </p>
+              </Card>
+            )}
+          </>
+        )}
+        <details className={s.disclosure}>
+          <summary>EPFO’s message</summary>
+          <p className={s.sub}>
+            {diagnosis.rejectionCode.replaceAll("_", " ")}
+          </p>
+        </details>
+        <details className={s.disclosure}>
+          <summary>See the records we used</summary>
+          {diagnosis.evidence.map((item) => (
+            <p className={s.sub} key={item.evidenceId}>
+              {item.label} ·{" "}
+              {item.state === "VERIFIED"
+                ? "Verified in the source record."
+                : "Needs confirmation."}
+            </p>
+          ))}
+        </details>
+      </div>
+    </div>
   );
 }

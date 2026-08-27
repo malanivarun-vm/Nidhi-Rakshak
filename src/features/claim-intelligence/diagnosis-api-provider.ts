@@ -21,6 +21,8 @@ export type DiagnosisApiProvider = Pick<DiagnosisProvider, "getByCaseId">;
 export function createDiagnosisApiProvider(
   environment: Environment = process.env,
 ): DiagnosisApiProvider | null {
+  // Submission demo deliberately serves the four deterministic golden fixtures;
+  // live database mode remains an explicit provider swap, never an LLM verdict.
   if (environment.NIDHI_FIXTURE_MODE === "true")
     return createFixtureDiagnosisProvider();
 

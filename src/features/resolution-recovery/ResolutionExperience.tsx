@@ -492,11 +492,30 @@ const Summary = ({
         )}
       </div>
       <p className={styles.eyebrow}>
-        {refused ? "Safe fallback" : "We found the problem"}
+        {refused ? "Safe fallback" : "Your next step"}
       </p>
-      <h1>{headline(diagnosis)}</h1>
-      <p>{diagnosis.problemSummary}</p>
+      <h1>
+        {refused ? headline(diagnosis) : "Let’s take the safest next step."}
+      </h1>
+      <p>
+        {refused
+          ? diagnosis.problemSummary
+          : `Resolving: ${diagnosis.problemSummary}`}
+      </p>
     </section>
+    {diagnosis.verdict === "FIGHT" && (
+      <aside className={styles.preview}>
+        <span className={styles.previewLabel}>
+          TRY BEFORE YOU TOUCH · SIMULATION ONLY
+        </span>
+        <h2>Changing your current name creates more mismatches.</h2>
+        <p>
+          <strong>Before:</strong> 1 mismatch &nbsp; <strong>After:</strong> 2
+          mismatches
+        </p>
+        <p>Keep your current details. No record will be changed here.</p>
+      </aside>
+    )}
     {diagnosis.doNotTouch.applies && (
       <aside className={styles.warning}>
         <CircleAlert />

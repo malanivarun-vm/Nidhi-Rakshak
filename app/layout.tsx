@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "../src/styles/globals.css";
 
 export const metadata: Metadata = {
   title: "Nidhi Rakshak",
