@@ -10,7 +10,7 @@ import {
   getRejectionContract,
 } from "./rejection-registry";
 
-const claimContextSchema = z.object({
+export const ClaimContextSchema = z.object({
   caseId: z.string().trim().min(1).max(120),
   claim: z.object({
     claimId: z.string().uuid(),
@@ -25,7 +25,7 @@ const claimContextSchema = z.object({
   }),
   evidence: z.array(ContextEvidence),
 });
-export type ClaimContext = z.infer<typeof claimContextSchema>;
+export type ClaimContext = z.infer<typeof ClaimContextSchema>;
 
 const loadInputSchema = z.object({ caseId: z.string().trim().min(1).max(120) });
 const createInputSchema = z.object({
@@ -63,34 +63,44 @@ export type DecodedClaimContextResult =
   | { kind: "INVALID_CONTEXT"; code: "CLAIM_CONTEXT_INVALID" }
   | { kind: "RETRYABLE_ERROR"; code: "CLAIM_CONTEXT_UNAVAILABLE" };
 
-function decodeRejection(context: ClaimContext): RejectionDecoding {
+export type AvailableDecodedClaimContext = Extract<
+  DecodedClaimContextResult,
+  { kind: "AVAILABLE" }
+>;
+
+export function decodeClaimContext(
+  context: ClaimContext,
+): AvailableDecodedClaimContext {
+  const parsed = ClaimContextSchema.parse(context);
   const contract =
-    (context.rejection.code === null
+    (parsed.rejection.code === null
       ? null
-      : getRejectionContract(context.rejection.code)) ??
-    findRejectionContractByPattern(context.rejection.rawText);
+      : getRejectionContract(parsed.rejection.code)) ??
+    findRejectionContractByPattern(parsed.rejection.rawText);
 
   if (
     contract === null ||
     contract.prototypeSupport === "DECLARED_UNSUPPORTED" ||
     contract.code === "UNMAPPED_REJECTION"
   )
-    return { status: "UNSUPPORTED", contract: null };
+    return {
+      kind: "AVAILABLE",
+      context: parsed,
+      decoding: { status: "UNSUPPORTED", contract: null },
+      evidence: { state: "UNKNOWN", missing: [], contradictions: [] },
+    };
 
-  return { status: "SUPPORTED", contract };
-}
+  const evidence: EvidenceGateResult = assessEvidenceSufficiency({
+    requirements: contract.evidenceRequired,
+    evidence: parsed.evidence,
+  });
 
-function decodedResult(context: ClaimContext): DecodedClaimContextResult {
-  const decoding = decodeRejection(context);
-  const evidence: EvidenceGateResult =
-    decoding.status === "UNSUPPORTED"
-      ? { state: "UNKNOWN", missing: [], contradictions: [] }
-      : assessEvidenceSufficiency({
-          requirements: decoding.contract.evidenceRequired,
-          evidence: context.evidence,
-        });
-
-  return { kind: "AVAILABLE", context, decoding, evidence };
+  return {
+    kind: "AVAILABLE",
+    context: parsed,
+    decoding: { status: "SUPPORTED", contract },
+    evidence,
+  };
 }
 
 async function parseRepositoryContext(
@@ -100,11 +110,11 @@ async function parseRepositoryContext(
     const value = await read();
     if (value === null) return { kind: "NOT_FOUND" };
 
-    const parsed = claimContextSchema.safeParse(value);
+    const parsed = ClaimContextSchema.safeParse(value);
     if (!parsed.success)
       return { kind: "INVALID_CONTEXT", code: "CLAIM_CONTEXT_INVALID" };
 
-    return decodedResult(parsed.data);
+    return decodeClaimContext(parsed.data);
   } catch (error) {
     if (error instanceof ClaimContextUnavailableError)
       return { kind: "RETRYABLE_ERROR", code: "CLAIM_CONTEXT_UNAVAILABLE" };
