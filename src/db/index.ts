@@ -4,23 +4,29 @@ import * as schema from "./schema";
 
 export type Database = NodePgDatabase<typeof schema>;
 
-let pool: Pool | undefined;
+const pools = new Map<string, Pool>();
+const databases = new Map<string, Database>();
 
 export const getDatabase = (): Database | undefined => {
-  if (
-    !process.env.DATABASE_URL ||
-    process.env.NIDHI_DISABLE_DATABASE === "true"
-  )
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString || process.env.NIDHI_DISABLE_DATABASE === "true")
     return undefined;
-  pool ??= new Pool({ connectionString: process.env.DATABASE_URL });
-  return drizzle(pool, { schema });
+  return createDatabase(connectionString);
 };
 
 export const closeDatabase = async () => {
-  if (pool) await pool.end();
-  pool = undefined;
+  await Promise.all([...pools.values()].map((pool) => pool.end()));
+  pools.clear();
+  databases.clear();
 };
 
 export function createDatabase(connectionString: string): Database {
-  return drizzle(new Pool({ connectionString }), { schema });
+  const existing = databases.get(connectionString);
+  if (existing) return existing;
+
+  const pool = new Pool({ connectionString });
+  const database = drizzle(pool, { schema });
+  pools.set(connectionString, pool);
+  databases.set(connectionString, database);
+  return database;
 }

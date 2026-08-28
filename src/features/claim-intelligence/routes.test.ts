@@ -96,7 +96,9 @@ describe("diagnosis route", () => {
 
   it("does not serve fixture data when fixture mode is disabled", async () => {
     const previousFixtureMode = process.env.NIDHI_FIXTURE_MODE;
+    const previousDatabaseUrl = process.env.DATABASE_URL;
     Reflect.deleteProperty(process.env, "NIDHI_FIXTURE_MODE");
+    Reflect.deleteProperty(process.env, "DATABASE_URL");
 
     try {
       const response = await GET(new Request("http://localhost"), {
@@ -109,6 +111,11 @@ describe("diagnosis route", () => {
       });
     } finally {
       restoreFixtureMode(previousFixtureMode);
+      if (previousDatabaseUrl === undefined) {
+        Reflect.deleteProperty(process.env, "DATABASE_URL");
+      } else {
+        process.env.DATABASE_URL = previousDatabaseUrl;
+      }
     }
   });
 });
