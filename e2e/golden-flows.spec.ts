@@ -76,6 +76,17 @@ test.describe("golden resolution journeys", () => {
     ).toBeVisible();
   });
 
+  test("front door is keyboard accessible", async ({ page }) => {
+    await page.goto("/");
+    const entry = page.getByRole("button", {
+      name: /Understand a rejected claim/,
+    });
+    await entry.focus();
+    await expect(entry).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText("Your rejected claims")).toBeVisible();
+  });
+
   test("Fight creates a simulated EPFO package and restores it after reload", async ({
     page,
   }) => {
@@ -143,7 +154,7 @@ test.describe("golden resolution journeys", () => {
     await expect(page.getByRole("checkbox")).toHaveCount(0);
   });
 
-  for (const width of [375, 1440]) {
+  for (const width of [375, 390, 1280, 1440]) {
     test(`has no horizontal overflow at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await openCase(page, cases.fight);

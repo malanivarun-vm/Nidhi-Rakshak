@@ -99,6 +99,47 @@ describe("Claim Intelligence API", () => {
     });
   });
 
+  it.runIf(process.env.DATABASE_URL)(
+    "restores uploaded evidence after a database-backed reload",
+    async () => {
+      process.env.NIDHI_FIXTURE_MODE = "false";
+      resetClaimApiStore();
+
+      const uploaded = await addEvidence(
+        new Request("http://localhost", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": "database-evidence-reload",
+          },
+          body: JSON.stringify({
+            source: "member_document",
+            label: "Persisted appointment letter",
+            state: "VERIFIED",
+          }),
+        }),
+        context,
+      );
+      expect(uploaded.status).toBe(200);
+
+      resetClaimApiStore();
+      const reloaded = await getEvidence(
+        new Request("http://localhost"),
+        context,
+      );
+
+      expect((await reloaded.json()).data.evidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            source: "member_document",
+            label: "Persisted appointment letter",
+            state: "VERIFIED",
+          }),
+        ]),
+      );
+    },
+  );
+
   it("returns validated context for a fixture claim UUID", async () => {
     const response = await getRescueContext(new Request("http://localhost"), {
       params: Promise.resolve({ claimId: stableUuid(caseId) }),

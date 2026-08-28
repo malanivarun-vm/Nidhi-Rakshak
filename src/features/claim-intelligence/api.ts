@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { getDatabase } from "../../db";
 import {
   claimRejections,
   claims,
+  diagnosisRuns,
   evidenceItems,
   rescueCases,
 } from "../../db/schema";
@@ -30,6 +31,11 @@ type CaseData = {
   diagnosis: DiagnosisResultType;
   context: ClaimContext;
   evidence: z.infer<typeof ContextEvidence>[];
+};
+
+type PersistedEvidence = {
+  evidence: z.infer<typeof ContextEvidence>;
+  idempotencyKey?: string;
 };
 
 const cases = new Map<string, CaseData>();
@@ -63,6 +69,64 @@ const fixtureContext = (diagnosis: DiagnosisResultType): CaseData => {
   return { diagnosis, context, evidence };
 };
 
+const persistedCase = async (caseId: string) => {
+  const database = getDatabase();
+  if (!database) return undefined;
+  const rows = await database
+    .select({ caseId: rescueCases.id })
+    .from(rescueCases)
+    .innerJoin(diagnosisRuns, eq(diagnosisRuns.caseId, rescueCases.id))
+    .where(sql`${diagnosisRuns.result}->>'caseId' = ${caseId}`)
+    .limit(1);
+  const caseRecord = rows[0];
+  return caseRecord ? { database, caseId: caseRecord.caseId } : undefined;
+};
+
+const readPersistedEvidence = async (
+  caseId: string,
+): Promise<PersistedEvidence[]> => {
+  const stored = await persistedCase(caseId);
+  if (!stored) return [];
+  const rows = await stored.database
+    .select({
+      id: evidenceItems.id,
+      source: evidenceItems.source,
+      label: evidenceItems.label,
+      state: evidenceItems.state,
+      provenance: evidenceItems.provenance,
+    })
+    .from(evidenceItems)
+    .where(
+      and(
+        eq(evidenceItems.caseId, stored.caseId),
+        sql`${evidenceItems.provenance}->>'nidhiRakshakUpload' = 'true'`,
+      ),
+    );
+
+  return rows.map((row) => {
+    const provenance =
+      typeof row.provenance === "object" && row.provenance !== null
+        ? row.provenance
+        : {};
+    const value = (key: string) =>
+      typeof provenance[key as keyof typeof provenance] === "string"
+        ? (provenance[key as keyof typeof provenance] as string)
+        : undefined;
+    return {
+      evidence: ContextEvidence.parse({
+        evidenceId: row.id,
+        source: row.source,
+        label: row.label,
+        state: row.state,
+        observedAt: value("observedAt"),
+        assertionKey: value("assertionKey"),
+        assertionValue: value("assertionValue"),
+      }),
+      idempotencyKey: value("idempotencyKey"),
+    };
+  });
+};
+
 const ensureCase = async (caseId: string): Promise<CaseData | null> => {
   const existing = cases.get(caseId);
   if (existing) return existing;
@@ -71,6 +135,17 @@ const ensureCase = async (caseId: string): Promise<CaseData | null> => {
   const diagnosis = await provider.getByCaseId(caseId);
   if (!diagnosis) return null;
   const data = fixtureContext(DiagnosisResult.parse(diagnosis));
+  const uploadedEvidence =
+    process.env.NIDHI_FIXTURE_MODE === "true"
+      ? []
+      : await readPersistedEvidence(caseId);
+  if (uploadedEvidence.length > 0) {
+    data.evidence.push(...uploadedEvidence.map((item) => item.evidence));
+    data.context = ClaimContextSchema.parse({
+      ...data.context,
+      evidence: data.evidence,
+    });
+  }
   cases.set(caseId, data);
   return data;
 };
@@ -179,10 +254,39 @@ export const addClaimEvidence = async (
   const key = `${caseId}:${idempotencyKey}`;
   const replay = evidenceKeys.get(key);
   if (replay) return replay;
-  const evidence = ContextEvidence.parse({
+  const persisted = await readPersistedEvidence(caseId);
+  const existing = persisted.find((item) => item.idempotencyKey === key);
+  if (existing) {
+    evidenceKeys.set(key, existing.evidence);
+    return existing.evidence;
+  }
+  let evidence = ContextEvidence.parse({
     ...parsed,
     evidenceId: `evidence-${stableUuid(key).slice(0, 12)}`,
   });
+  const stored = await persistedCase(caseId);
+  if (stored) {
+    const inserted = await stored.database
+      .insert(evidenceItems)
+      .values({
+        caseId: stored.caseId,
+        source: evidence.source,
+        label: evidence.label,
+        state: evidence.state,
+        provenance: {
+          observedAt: evidence.observedAt,
+          assertionKey: evidence.assertionKey,
+          assertionValue: evidence.assertionValue,
+          idempotencyKey: key,
+          nidhiRakshakUpload: true,
+        },
+      })
+      .returning({ id: evidenceItems.id });
+    evidence = ContextEvidence.parse({
+      ...evidence,
+      evidenceId: inserted[0].id,
+    });
+  }
   data.evidence.push(evidence);
   data.context = ClaimContextSchema.parse({
     ...data.context,
