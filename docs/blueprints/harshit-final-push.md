@@ -57,3 +57,11 @@ The release contains diagnosis/action/handoff/receipt idempotency migrations, bu
 ### Infrastructure update — 2026-08-28
 
 Supabase authentication/link later succeeded and `supabase db push` reported no pending migration. The approved seed did not change the database: Vercel’s listed `POSTGRES_*` variables export as empty in this session, so the seed attempted only local Postgres and failed before SQL. A real non-empty database connection is the remaining prerequisite for persisted flow/idempotency and Preview verification.
+
+### Live verification update — 2026-08-28
+
+Live Supabase verification is complete through local candidate `cc80c4ef8583b7584598bd4945af68e27bb57695` (not pushed to `main`): migration is current; deterministic seed verification passed for 500 claims/cases across 125 member scopes; all four current golden cases and resolution idempotency indexes were confirmed. Database-provider replay passed and `DiagnosisResult.parse` preserved every required identity/version field.
+
+Preview `https://nidhi-rakshak-rdy80s979-malanivarun-7789s-projects.vercel.app` is `READY` with real-provider mode and an isolated transaction-pooler runtime URL. Its API replay passed Fight action/receipt/tracking/same-blocker, Forward action/employer handoff/tracking, Fix safe simulation/action/resolved re-check, and Unsupported refusal/evidence capture. The evidence upload initially revealed an in-memory-only bug; local commit `cc80c4e` persists and reloads it through `evidence_items`, proven again by a separate Preview request.
+
+Local fixture checks now pass with 88 tests (one database-only skip), preflight, build, and 10 browser tests including keyboard activation and 390px/1280px no-overflow checks. The focused real-database suite passes serially (9/9); a parallel complete database suite has three golden-flow timeouts under the shared pooler and is not a release pass. Production is unchanged. The Supabase cleanup reset then disconnected and read-only Session-pooler probes stalled; do not push/promote until clean-state counts can be confirmed. Preview browser/camera checks also need a Vercel SSO bypass.
