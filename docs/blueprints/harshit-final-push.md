@@ -53,3 +53,7 @@ After I2, the integration driver applies the frozen migration to Supabase dev, v
 Candidate `3acd18f4b07227ff71d84b1889c5308c35fd446d` passed local fixture fallback: `pnpm check`, 86 unit tests, preflight, build, and 7 Playwright tests covering Fight receipt/reload/tracking, Forward handoff/tracking, Fix simulation/consent/re-check, Unsupported refusal, synthetic upload fallback, and no overflow at 375px/1440px.
 
 The release contains diagnosis/action/handoff/receipt idempotency migrations, but no Supabase connection was available. Persisted duplicate-request, restart, migration/index, and real provider results are therefore unverified. No Vercel environment changed and no Preview was created. GitHub had already deployed the candidate to Production, `READY`, at `https://nidhi-rakshak-4ij38wef2-malanivarun-7789s-projects.vercel.app`; this session did not promote it. Camera permission, keyboard/focus/accessibility audit, and 390px/1280px replays remain unverified.
+
+### Infrastructure update — 2026-08-28
+
+Supabase authentication/link later succeeded and `supabase db push` reported no pending migration. The approved seed did not change the database: Vercel’s listed `POSTGRES_*` variables export as empty in this session, so the seed attempted only local Postgres and failed before SQL. A real non-empty database connection is the remaining prerequisite for persisted flow/idempotency and Preview verification.

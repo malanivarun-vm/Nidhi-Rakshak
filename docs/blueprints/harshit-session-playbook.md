@@ -177,3 +177,5 @@ failure and fix only B-owned files.
 ## Release verification evidence — 2026-08-28
 
 Recorded candidate: `3acd18f4b07227ff71d84b1889c5308c35fd446d`. Local fixture evidence is green: check, 86 unit tests, preflight, build, and 7 Playwright tests. The live integration gate remains blocked by missing Supabase CLI authentication and `DATABASE_URL`; do not infer persisted recheck/receipt/handoff/idempotency, do not change Vercel database variables, and do not promote. The existing Production deployment came from GitHub and is `READY`; no Preview was made in this run.
+
+**Update:** the Supabase CLI is now authenticated and linked; `supabase db push` found no pending migration. The seed remains blocked by an empty connection export from Vercel’s Production `POSTGRES_*` entries. No database write occurred.
