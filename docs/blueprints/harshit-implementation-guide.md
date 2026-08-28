@@ -207,3 +207,7 @@ Track resolution starts, simulation completion, handoff/receipt generation, re-c
 - [ ] Every chunk boundary is explicit and B writes only B tables.
 - [ ] Fixture contract tests and all static checks pass.
 - [ ] `pnpm check`, `pnpm test`, and `pnpm build` pass.
+
+## Release verification evidence — 2026-08-28
+
+Candidate `3acd18f4b07227ff71d84b1889c5308c35fd446d` passed all local fixture fallback commands: check, 86 unit tests, preflight, build, and 7 committed Playwright golden-flow tests. Supabase migration/seed, persisted action/recheck/idempotency proof, four real-provider replays, and Vercel Preview parity are blocked by unavailable `SUPABASE_ACCESS_TOKEN` and `DATABASE_URL`; no environment was switched to database mode. Existing GitHub Production deployment is `READY` but was not promoted by this release run. See `harshit-final-push.md` for detailed evidence.

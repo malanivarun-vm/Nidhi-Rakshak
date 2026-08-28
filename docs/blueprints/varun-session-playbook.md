@@ -182,3 +182,7 @@ Stop on any failure and fix only A-owned files.
 - [ ] No load-bearing 🔵 remains.
 - [ ] A emits, never mutates, the shared `DiagnosisResult` boundary.
 - [ ] FP rehearsal is complete before I1.
+
+## Release verification evidence — 2026-08-28
+
+Recorded candidate: `3acd18f4b07227ff71d84b1889c5308c35fd446d`. Fixture fallback is green: check, 86 unit tests, preflight, build, and 7 Playwright tests. The remaining live gate is blocked, not passed: no Supabase access token or `DATABASE_URL` was available, so no hosted migration/reset/seed, real-provider replay, Vercel database-mode setting, Preview, or promotion was performed. Current golden IDs: Fight `case-golden-fight-relation-name`, Forward `case-golden-forward-exit-date`, Fix `case-golden-fix-bank`, Unsupported `case-golden-unsupported`.

@@ -212,3 +212,7 @@ Measure supported diagnosis rate, golden verdict agreement, evidence request rat
 - [ ] Every chunk has explicit ownership and boundary contracts.
 - [ ] Every endpoint validates input and has a failure path.
 - [ ] Contract/golden tests, `pnpm check`, `pnpm test`, and `pnpm build` pass.
+
+## Release verification evidence — 2026-08-28
+
+Candidate `3acd18f4b07227ff71d84b1889c5308c35fd446d` passed explicit fixture fallback: check, 86 unit tests, preflight, build, and 7 local Playwright golden-flow tests. The typed adapter parsed all four current golden cases unchanged. Supabase migration/seed, hosted counts/index inspection, real-provider replay, persistent idempotency, and Vercel Preview parity remain blocked because this session has no `SUPABASE_ACCESS_TOKEN` or `DATABASE_URL`. No Vercel environment changed; the existing GitHub-triggered Production deployment is `READY`. See `varun-final-push.md` for the complete evidence matrix.
